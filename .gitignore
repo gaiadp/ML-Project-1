@@ -216,3 +216,18 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# ---- Project 1 ----
+# Dataset (too large for git, download from AIcrowd)
+data/*
+!data/.gitkeep
+# Generated predictions
+submissions/*.csv
+# LaTeX build artifacts
+report/*.aux
+report/*.bbl
+report/*.blg
+report/*.out
+report/*.synctex.gz
+report/*.fdb_latexmk
+report/*.fls

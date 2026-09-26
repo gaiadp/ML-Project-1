@@ -1,0 +1,94 @@
+% CS-433 Machine Learning, Fall 2026 - Project 1 report
+% Adapted from the course template:
+% https://github.com/epfml/ML_course/tree/main/projects/project1/latex-example-paper
+%
+% Hard limit: 2 pages of content + 1 extra page for references only.
+% Compile with:
+%   pdflatex report && bibtex report && pdflatex report && pdflatex report
+
+\documentclass[10pt,conference,compsocconf]{IEEEtran}
+
+\usepackage{hyperref}
+\usepackage{graphicx}  % for \includegraphics
+\usepackage{amsmath}   % for math environments
+
+\begin{document}
+
+\title{Predicting Coronary Heart Disease Risk from BRFSS Lifestyle Data}
+
+\author{
+  Name1 Surname1, Name2 Surname2, Name3 Surname3\\
+  \textit{Department of Computer Science, EPFL, Switzerland}
+}
+
+\maketitle
+
+\begin{abstract}
+  % 4 things to cover: the problem, why it matters, what your solution
+  % achieves, what follows from it. Write this section last.
+\end{abstract}
+
+\section{Introduction}
+\label{sec:introduction}
+% State the problem (predicting MICHD from BRFSS survey data), why it is
+% interesting/relevant, and summarize your contributions/approach.
+
+\section{Data and Exploratory Analysis}
+\label{sec:eda}
+% Describe the dataset (size, features, class imbalance), what you found in
+% exploratory data analysis, and how it motivated your preprocessing choices.
+% See experiments/eda.py.
+
+\section{Models and Methods}
+\label{sec:methods}
+% Describe your preprocessing/feature engineering pipeline (src/preprocessing.py,
+% src/features.py) and the models you used, including the 6 required methods
+% from implementations.py and any custom extension (src/models.py). Include
+% enough detail (hyperparameters, feature transforms, number of CV folds, ...)
+% for reproducibility.
+
+% Example figure:
+% \begin{figure}[tbp]
+%   \centering
+%   \includegraphics[width=\columnwidth]{figures/my_figure}
+%   \caption{Caption describing the figure.}
+%   \label{fig:my-figure}
+% \end{figure}
+
+\section{Results}
+\label{sec:results}
+% Report cross-validated performance of the baseline methods (Table 1: the 6
+% required methods) and of your improved pipeline. Include the ablation study:
+% which modification helped the most? See experiments/baselines.py,
+% experiments/tuning.py, experiments/ablation.py.
+
+% Example table:
+% \begin{table}[htbp]
+%   \centering
+%   \begin{tabular}{|l|c|c|}
+%     \hline
+%     Method & CV Accuracy & CV F1 \\
+%     \hline
+%     Least squares & & \\
+%     Ridge regression & & \\
+%     Logistic regression & & \\
+%     Our final model & & \\
+%     \hline
+%   \end{tabular}
+%   \caption{Cross-validated performance comparison.}
+%   \label{tab:results}
+% \end{table}
+
+\section{Discussion}
+\label{sec:discussion}
+% Discuss strengths/weaknesses of your approach based on the results above.
+% Explain unexpected results, failure cases, limitations.
+
+\section{Summary}
+\label{sec:summary}
+% Summarize your contributions and findings.
+
+\bibliographystyle{IEEEtran}
+\bibliography{references}
+
+\end{document}
