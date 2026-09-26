@@ -1,3 +1,5 @@
+# Only allowed libraries per the project rules: numpy, standard lib, and
+# matplotlib/seaborn for visualization only (no pandas, sklearn, torch, ...).
 numpy
 matplotlib
 seaborn

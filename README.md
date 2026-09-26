@@ -14,14 +14,6 @@ Competition: https://www.aicrowd.com/challenges/epfl-machine-learning-project-1
   signatures — they are imported directly by the auto-grader.
 - `run.py` must reproduce the `.csv` of our best AIcrowd submission.
 
-## Setup
-
-1. Create an AIcrowd account with your epfl.ch email and download the dataset from the
-   competition page.
-2. Place `x_train.csv`, `y_train.csv`, `x_test.csv` in [data/](data/) (untracked by git, see
-   [.gitignore](.gitignore)).
-3. `pip install -r requirements.txt`
-
 ## Repository structure
 
 ```
@@ -44,26 +36,6 @@ notebooks/            # Scratch/exploration notebooks (not graded, keep experime
 tests/                 # Our sanity tests (official grading_tests run separately, see below)
 report/                # LaTeX report (2 pages + 1 page references, from the course template)
   figures/               # Figures exported from experiments/, referenced by report.tex
-data/                  # x_train.csv, y_train.csv, x_test.csv (gitignored)
+dataset/               # x_train.csv, y_train.csv, x_test.csv (gitignored)
 submissions/           # Generated prediction .csv files (gitignored)
 ```
-
-## Team & task split
-
-| Person | Area | Files owned |
-|---|---|---|
-| TBD | Data & EDA | `src/preprocessing.py`, `experiments/eda.py` |
-| TBD | Modeling & tuning | `src/models.py`, `src/cross_validation.py`, `experiments/tuning.py`, `experiments/ablation.py` |
-| TBD | Methods, pipeline & report | `implementations.py`, `src/features.py`, `run.py`, `report/` |
-
-Everyone reviews everyone's PRs. `implementations.py` is graded verbatim — changes to it
-need a second pair of eyes before merging.
-
-## Suggested workflow
-
-1. Work on a branch per feature/person, open a PR into `main`, get one review before merging.
-2. Keep `main` always able to run `python run.py` end-to-end.
-3. Run the official grading tests before each submission:
-   https://github.com/epfml/ML_course/tree/main/projects/project1/grading_tests
-4. Log experiment results (method, hyperparameters, CV score) somewhere shared (e.g. a table
-   in `experiments/`) so the ablation study and report are easy to write up.

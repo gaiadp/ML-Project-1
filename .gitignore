@@ -219,15 +219,9 @@ __marimo__/
 
 # ---- Project 1 ----
 # Dataset (too large for git, download from AIcrowd)
-data/*
-!data/.gitkeep
+dataset/*
+!dataset/.gitkeep
 # Generated predictions
 submissions/*.csv
-# LaTeX build artifacts
-report/*.aux
-report/*.bbl
-report/*.blg
-report/*.out
-report/*.synctex.gz
-report/*.fdb_latexmk
-report/*.fls
+# LaTeX build artifacts (see report/README.md: compile with -output-directory=build)
+report/build/
