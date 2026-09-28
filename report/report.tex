@@ -46,6 +46,15 @@
 % enough detail (hyperparameters, feature transforms, number of CV folds, ...)
 % for reproducibility.
 
+% Note on least_squares: the normal-equations matrix X^T X can be
+% rank-deficient or ill-conditioned when features are collinear or
+% redundant, so np.linalg.solve (which assumes a nonsingular system) is not
+% a reliable solver. Since X^T X is symmetric positive semi-definite, we
+% instead eigendecompose it and build its Moore-Penrose pseudo-inverse by
+% inverting only the numerically nonzero eigenvalues, which yields the
+% minimum-norm solution even in the rank-deficient case (np.linalg.lstsq
+% is disallowed by the assignment).
+
 % Example figure:
 % \begin{figure}[tbp]
 %   \centering

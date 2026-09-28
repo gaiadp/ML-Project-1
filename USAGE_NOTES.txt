@@ -1,0 +1,137 @@
+ACCORTEZZE PER USARE IL CODICE E COSTRUIRE I MODELLI
+=====================================================
+Note per il gruppo: cose non ovvie da tenere a mente quando si usano le funzioni in
+src/ e implementations.py. Ogni punto indica dove si trova il codice interessato.
+
+1. DATI E ETICHETTE
+-------------------
+- Etichette: y_train.csv e load_csv_data (helpers.py) danno y in {-1, 1}.
+  * logistic_regression / reg_logistic_regression vogliono y in {0, 1}
+    -> convertire con  y01 = (y == 1).astype(float)
+  * la submission (create_csv_submission) vuole di nuovo {-1, 1}, altrimenti ValueError
+    -> y_pred = np.where(p >= soglia, 1, -1)
+- Classi sbilanciate: solo ~8.8% di positivi (MICHD). Un modello che dice sempre
+  "no" ha ~91% di accuracy -> valutare con F1, pesare le classi o regolare la soglia
+  di decisione (0.5 quasi sempre troppo alta). La soglia va scelta su validation,
+  mai sul test.
+- Caricamento lento: np.genfromtxt su x_train impiega circa 1 minuto. Conviene salvare
+  una volta gli array in build/ (np.savez) e poi ricaricarli con np.load.
+- Memoria: x_train e' 328135 x 321 float64 = ~840 MB. Espansioni polinomiali o
+  one-hot su molte colonne la moltiplicano: selezionare le feature PRIMA di espandere
+  (oppure usare float32).
+- load_csv_data toglie la colonna Id: i nomi delle colonne corrispondenti sono
+  header di x_train.csv SENZA il primo elemento ("Id").
+
+
+2. CODICI SPECIALI BRFSS  (src/preprocessing.py: codes_to_nan)
+---------------------------------------------------------------
+- Il significato di un codice cambia da colonna a colonna: EMPLOY1=7 e' "pensionato",
+  _AGEG5YR=7/9 sono fasce d'eta', _AGE80=77 e' un'eta', _STATE=9 e' il Connecticut.
+  Per questo codes_to_nan(x, names) usa regole per NOME di colonna (_RULES).
+  -> passare sempre i nomi nello stesso ordine delle colonne di x.
+  -> se si aggiunge o toglie una colonna prima di chiamarla, i nomi devono seguire.
+- Codici "nessuno/mai" (88, 555, 888, per alcune colonne 98) diventano 0, NON NaN:
+  "88 giorni di cattiva salute" in realta' significa 0 giorni.
+- Le colonne a 3 cifre hanno UNITA' MISTE e non sono ancora convertite:
+  ALCDAY5 (1xx = a settimana, 2xx = al mese), FRUIT1, FVBEANS, VEGETAB1, ...
+  (1xx/2xx/3xx = al giorno/settimana/mese), EXEROFT1/2, STRENGTH, WEIGHT2 (9xxx = kg),
+  HEIGHT3 (piedi/pollici oppure 9xxx = cm).
+  -> non usarle come numeri cosi' come sono: convertirle in una scala unica, oppure
+     usare le versioni gia' calcolate (DROCDY3_, FRUTDA1_, VEGEDA1_, WTKG3, HTM4, _BMI5).
+- Molte domande si/no sono codificate 1 = si', 2 = no: il segno del peso appare
+  "invertito". Non e' un errore, ma va ricordato quando si interpretano i coefficienti.
+- Colonne da NON usare come feature: identificativi e variabili di disegno/peso del
+  sondaggio (SEQNO, _PSU, IDATE, _STSTR, _STRWT, _LLCPWT, _WT2RAKE, ...). Non descrivono
+  la persona e aggiungono solo rumore.
+- Missing informativi: molte domande vengono poste solo a un sottogruppo (skip logic,
+  es. BPMEDS solo a chi ha la pressione alta). In quei casi il fatto che il dato
+  manchi e' predittivo -> valutare una colonna indicatrice np.isnan(col).
+
+
+3. ORDINE DEL PREPROCESSING  (src/preprocessing.py, src/features.py)
+---------------------------------------------------------------------
+Ordine consigliato:
+  codes_to_nan -> scelta/rimozione colonne -> imputazione -> encoding/espansioni
+  -> standardizzazione -> add_bias
+
+- FIT SOLO SUL TRAINING. Tutte le statistiche (mediane, media/std, maschera delle
+  colonne, categorie del one-hot) si calcolano sul training e si RIUSANO su validation
+  e test. Calcolarle su tutto il dataset = data leakage (stime troppo ottimistiche).
+- In cross-validation vale lo stesso: il preprocessing va rifittato DENTRO ogni fold,
+  solo sulla parte di training del fold.
+- drop_high_missing_columns restituisce una maschera: calcolarla sul training e
+  applicare la STESSA maschera (drop_columns) a validation e test.
+- fit_impute_median: va chiamata DOPO la rimozione delle colonne, cosi' gli indici
+  delle mediane corrispondono. Una colonna tutta NaN ha mediana NaN e resta NaN.
+- fit_standardize: con NaN presenti la media diventa NaN -> imputare PRIMA.
+  Le colonne costanti (std = 0) vengono lasciate con std = 1 (diventano tutte 0).
+- add_bias va chiamata DOPO la standardizzazione: la colonna di 1 ha std = 0, quindi
+  standardizzandola diventerebbe una colonna di 0 e il modello perderebbe l'intercetta.
+
+
+4. ONE-HOT ENCODING  (src/features.py: one_hot_encode)
+-------------------------------------------------------
+- Serve per le variabili categoriche: i codici numerici (es. EMPLOY1 = 1..8) non sono
+  quantita', e trattarli come numeri impone un andamento lineare che non esiste.
+  Con il one-hot ogni categoria ha il suo peso.
+- Funzionamento: (x_col[:, None] == categories[None, :]) crea una matrice (N, K) con
+  1 nella colonna della categoria della riga e 0 altrove.
+- Le categorie vanno fissate sul training e riusate:
+      enc_tr, cats = one_hot_encode(x_train[:, j])
+      enc_te, _    = one_hot_encode(x_test[:, j], categories=cats)
+  altrimenti, se una categoria manca in uno split, le colonne non corrispondono.
+- NaN e categorie mai viste nel training -> riga tutta a 0 (NaN == x e' sempre False).
+  Il NaN diventa quindi la "categoria di riferimento" e il suo effetto finisce nel bias.
+  Se si vuole un peso proprio per "mancante", aggiungere una colonna np.isnan(x_col).
+  Se invece si imputa prima con la mediana, i NaN finiscono nella categoria mediana.
+- Collinearita': senza NaN ogni riga ha esattamente un 1, quindi le K colonne sommano
+  alla colonna del bias. Con ridge/logistica regolarizzata va bene; con least_squares
+  (o GD non regolarizzato) togliere una colonna di riferimento: enc[:, 1:].
+- Non usarlo su colonne con tanti valori distinti (eta', peso, giorni): troppe colonne
+  e pochi esempi per categoria. Per quelle: termini lineari/polinomiali o binning.
+
+
+5. ESPANSIONI DI FEATURE  (src/features.py: build_poly, pairwise_products)
+---------------------------------------------------------------------------
+- build_poly restituisce [x, x^2, ..., x^d] SENZA la colonna di 1: il bias va aggiunto
+  a parte con add_bias (una volta sola per tutta la matrice).
+- Applicarla a feature gia' standardizzate: le potenze di valori grandi (es. 200^4)
+  esplodono e rendono X^T X mal condizionata. Dopo l'espansione ri-standardizzare.
+- Inutile su colonne binarie o one-hot: x^2 = x, si creano solo colonne duplicate.
+- pairwise_products: il numero di coppie cresce come D^2 -> scegliere poche coppie
+  sensate, non tutte.
+- Feature ridondanti (es. 5 versioni dell'eta': _AGE80, _AGEG5YR, _AGE_G, _AGE65YR,
+  e MAXVO2_/FC60_ calcolate dall'eta'; _RFCHOL = TOLDHI2 ricodificata;
+  _DRDXAR1 = HAVARTH3) creano collinearita': tenerne una per gruppo.
+
+
+6. I 6 METODI  (implementations.py)
+------------------------------------
+- Le firme NON vanno cambiate: il grader le importa direttamente.
+- Ogni funzione restituisce (w, loss) con w = ULTIMO vettore di pesi (non il migliore)
+  e loss calcolata su quel w. Vettori 1D di forma (D,), non (D, 1).
+- MSE con fattore 1/2: loss = mean((y - tx @ w)**2) / 2.
+- Nei metodi regolarizzati la loss restituita NON include il termine di penalita'.
+- ridge_regression usa la convenzione (X^T X + 2 N lambda I) w = X^T y: i valori di
+  lambda non sono confrontabili con quelli di altre convenzioni (es. lambda I).
+  La penalita' si applica a TUTTI i pesi, compreso il bias (np.eye su tutte le
+  colonne): con features standardizzate l'effetto e' piccolo, ma va ricordato.
+- La penalita' ridge/L2 tratta tutte le feature allo stesso modo solo se hanno la
+  stessa scala -> standardizzare prima.
+- least_squares usa una pseudo-inversa (autovalori ~0 ignorati): funziona anche con
+  colonne collineari, ma in quel caso la soluzione non e' unica (minima norma).
+  numpy.linalg.lstsq e' vietato.
+- GD/SGD: il passo gamma dipende dalla scala delle feature; senza standardizzazione
+  diverge o e' lentissimo. Con logistica: calcolare sigmoide e log-loss in modo
+  numericamente stabile (evitare log(0) ed exp di numeri grandi, es. np.logaddexp).
+- Verificare con tests/test_implementations.py prima di consegnare.
+
+
+7. VALUTAZIONE E SUBMISSION
+----------------------------
+- Split/k-fold stratificati (stessa percentuale di positivi in ogni fold), con seed
+  fisso per rendere i risultati riproducibili.
+- run.py deve riprodurre ESATTAMENTE la nostra migliore submission: fissare i seed e
+  usare lo stesso preprocessing (con statistiche fittate sul training completo).
+- Gli Id della submission sono quelli di x_test (test_ids di load_csv_data), nello
+  stesso ordine delle predizioni.

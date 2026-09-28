@@ -225,3 +225,13 @@ dataset/*
 submissions/*.csv
 # LaTeX build artifacts (see report/README.md: compile with -output-directory=build)
 report/build/
+# Safety net if latexmk is ever run without -output-directory=build
+report/*.aux
+report/*.bbl
+report/*.blg
+report/*.fdb_latexmk
+report/*.fls
+report/*.log
+report/*.out
+report/*.synctex.gz
+report/*.toc
