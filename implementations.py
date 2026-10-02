@@ -48,6 +48,12 @@ def ridge_regression(y, tx, lambda_):
     # solve (X^T * X + 2 * N * lambda * I) * w = X^T * y
     # The resulting matrix is never singular because the regularization term is positive definite,
     # so we can use np.linalg.solve to solve the system of equations.
+    # Cost: forming X^T X is O(N D^2) and dominates; solve only adds O(D^3).
+    # A decomposition of X (e.g. SVD, X = U S V^T) costs several times more and only
+    # pays off when reused for many lambdas, as in cross-validation
+    # (see src/cross_validation.py: ridge_weights_svd). Working on X^T X squares the
+    # condition number, but with lambda > 0 this only matters for tiny lambdas and
+    # near-collinear features; for a single fit, solve is the cheaper choice.
     n = tx.shape[0]
     w = np.linalg.solve(tx.T @ tx + 2 * n * lambda_ * np.eye(tx.shape[1]), tx.T @ y)
     # Loss excludes the penalty term, per the grading convention
