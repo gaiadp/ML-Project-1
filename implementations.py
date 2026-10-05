@@ -13,12 +13,55 @@ import numpy as np
 
 def mean_squared_error_gd(y, tx, initial_w, max_iters, gamma):
     """Linear regression using gradient descent."""
-    raise NotImplementedError
+    """
+    Args:
+        y: shape=(N, )
+        tx: shape=(N,2)
+        initial_w: shape=(2, ). The initial guess (or the initialization) for the model parameters
+        max_iters: a scalar denoting the total number of iterations of GD
+        gamma: a scalar denoting the stepsize
+
+    Returns:
+        loss: the loss value (scalar) for the last iteration of GD
+        w: the model parameters as a numpy array of shape (2, ), for the last iteration of GD
+    """
+     # Define parameters to store w and loss
+    N = y.shape[0]
+    w = initial_w
+
+    for n_iter in range(max_iters):
+        gradient = -(tx.T @ (y-tx @ w))/N
+        w = w - gamma*gradient 
+    loss = 0.5*np.mean((y-(tx @ w))**2,axis =0 )
+    return loss, w
 
 
 def mean_squared_error_sgd(y, tx, initial_w, max_iters, gamma):
     """Linear regression using stochastic gradient descent (batch size 1)."""
-    raise NotImplementedError
+    """
+    Args:
+        y: shape=(N, )
+        tx: shape=(N,2)
+        initial_w: shape=(2, ). The initial guess (or the initialization) for the model parameters
+        batch_size: a scalar denoting the number of data points in a mini-batch used for computing the stochastic gradient
+        max_iters: a scalar denoting the total number of iterations of SGD
+        gamma: a scalar denoting the stepsize
+
+    Returns:
+        loss: the loss value (scalar) for the last iteration of GD
+         w: the model parameters as a numpy array of shape (2, ), for the last iteration of GD
+    """
+
+    #Define parameters to store w and loss
+    w = initial_w
+    N = y.shape[0]
+
+    for n_iter in range(max_iters):
+        i =  np.random.randint(N)
+        stoch_gradient = -(tx[i].T @ (y[i]-tx[i] @ w))/N
+        w = w - gamma*stoch_gradient 
+    loss = 0.5*np.mean((y-(tx @ w))**2,axis =0 )
+    return loss, w
 
 
 def least_squares(y, tx):
