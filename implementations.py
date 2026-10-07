@@ -16,8 +16,8 @@ def mean_squared_error_gd(y, tx, initial_w, max_iters, gamma):
     """
     Args:
         y: shape=(N, )
-        tx: shape=(N,2)
-        initial_w: shape=(2, ). The initial guess (or the initialization) for the model parameters
+        tx: shape=(N,D)
+        initial_w: shape=(D, ). The initial guess (or the initialization) for the model parameters
         max_iters: a scalar denoting the total number of iterations of GD
         gamma: a scalar denoting the stepsize
 
@@ -33,7 +33,7 @@ def mean_squared_error_gd(y, tx, initial_w, max_iters, gamma):
         gradient = -(tx.T @ (y-tx @ w))/N
         w = w - gamma*gradient 
     loss = 0.5*np.mean((y-(tx @ w))**2,axis =0 )
-    return loss, w
+    return w, loss
 
 
 def mean_squared_error_sgd(y, tx, initial_w, max_iters, gamma):
@@ -41,8 +41,8 @@ def mean_squared_error_sgd(y, tx, initial_w, max_iters, gamma):
     """
     Args:
         y: shape=(N, )
-        tx: shape=(N,2)
-        initial_w: shape=(2, ). The initial guess (or the initialization) for the model parameters
+        tx: shape=(N,D)
+        initial_w: shape=(D, ). The initial guess (or the initialization) for the model parameters
         batch_size: a scalar denoting the number of data points in a mini-batch used for computing the stochastic gradient
         max_iters: a scalar denoting the total number of iterations of SGD
         gamma: a scalar denoting the stepsize
@@ -58,10 +58,10 @@ def mean_squared_error_sgd(y, tx, initial_w, max_iters, gamma):
 
     for n_iter in range(max_iters):
         i =  np.random.randint(N)
-        stoch_gradient = -(tx[i].T @ (y[i]-tx[i] @ w))/N
+        stoch_gradient = -(tx[i].T @ (y[i]-tx[i] @ w))
         w = w - gamma*stoch_gradient 
     loss = 0.5*np.mean((y-(tx @ w))**2,axis =0 )
-    return loss, w
+    return w, loss
 
 
 def least_squares(y, tx):
