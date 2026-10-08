@@ -12,55 +12,55 @@ import numpy as np
 
 
 def mean_squared_error_gd(y, tx, initial_w, max_iters, gamma):
-    """Linear regression using gradient descent."""
-    """
+    """Linear regression using gradient descent.
+
     Args:
-        y: shape=(N, )
-        tx: shape=(N,D)
-        initial_w: shape=(D, ). The initial guess (or the initialization) for the model parameters
-        max_iters: a scalar denoting the total number of iterations of GD
-        gamma: a scalar denoting the stepsize
+        y: targets, shape=(N,)
+        tx: feature matrix, shape=(N, D)
+        initial_w: initial weights, shape=(D,)
+        max_iters: number of GD steps
+        gamma: step size
 
     Returns:
-        loss: the loss value (scalar) for the last iteration of GD
-        w: the model parameters as a numpy array of shape (2, ), for the last iteration of GD
+        w: weights after the last step, shape=(D,)
+        loss: MSE loss (with the 1/2 factor) at the returned w
     """
-     # Define parameters to store w and loss
-    N = y.shape[0]
+    n = y.shape[0]
     w = initial_w
-
-    for n_iter in range(max_iters):
-        gradient = -(tx.T @ (y-tx @ w))/N
-        w = w - gamma*gradient 
-    loss = 0.5*np.mean((y-(tx @ w))**2,axis =0 )
+    for _ in range(max_iters):
+        # Gradient of L(w) = 1/(2N) ||y - Xw||^2 is -X^T (y - Xw) / N
+        gradient = -tx.T @ (y - tx @ w) / n
+        w = w - gamma * gradient
+    # Loss of the final w (with max_iters=0 this is the loss of initial_w)
+    loss = np.mean((y - tx @ w) ** 2) / 2
     return w, loss
 
 
 def mean_squared_error_sgd(y, tx, initial_w, max_iters, gamma):
-    """Linear regression using stochastic gradient descent (batch size 1)."""
-    """
+    """Linear regression using stochastic gradient descent (mini-batch size 1).
+
     Args:
-        y: shape=(N, )
-        tx: shape=(N,D)
-        initial_w: shape=(D, ). The initial guess (or the initialization) for the model parameters
-        batch_size: a scalar denoting the number of data points in a mini-batch used for computing the stochastic gradient
-        max_iters: a scalar denoting the total number of iterations of SGD
-        gamma: a scalar denoting the stepsize
+        y: targets, shape=(N,)
+        tx: feature matrix, shape=(N, D)
+        initial_w: initial weights, shape=(D,)
+        max_iters: number of SGD steps (one sampled data point per step)
+        gamma: step size
 
     Returns:
-        loss: the loss value (scalar) for the last iteration of GD
-         w: the model parameters as a numpy array of shape (2, ), for the last iteration of GD
+        w: weights after the last step, shape=(D,)
+        loss: MSE loss (with the 1/2 factor) on the full dataset at the returned w
     """
-
-    #Define parameters to store w and loss
+    n = y.shape[0]
     w = initial_w
-    N = y.shape[0]
-
-    for n_iter in range(max_iters):
-        i =  np.random.randint(N)
-        stoch_gradient = -(tx[i].T @ (y[i]-tx[i] @ w))
-        w = w - gamma*stoch_gradient 
-    loss = 0.5*np.mean((y-(tx @ w))**2,axis =0 )
+    for _ in range(max_iters):
+        # Sample one data point uniformly at random
+        i = np.random.randint(n)
+        # Gradient of the single-sample loss 1/2 (y_i - x_i^T w)^2:
+        # (y_i - x_i^T w) is a scalar, so multiply (not matmul) by the vector x_i
+        stoch_gradient = -tx[i] * (y[i] - tx[i] @ w)
+        w = w - gamma * stoch_gradient
+    # Loss of the final w, evaluated on the whole dataset
+    loss = np.mean((y - tx @ w) ** 2) / 2
     return w, loss
 
 
