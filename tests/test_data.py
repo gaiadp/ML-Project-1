@@ -1,8 +1,4 @@
-"""Tests for src/data.py on a tiny fake dataset written in a temporary folder.
-
-The real CSVs are not needed: the files have the same format as the real ones.
-Run from the project root with:  pytest tests/
-"""
+"""Tests for src/data.py on a tiny fake dataset."""
 
 import os
 import sys
@@ -16,7 +12,6 @@ from src.data import build_cache, load_data  # noqa: E402
 
 
 def write_fake_dataset(folder, y_ids=None):
-    """Write x_train.csv, y_train.csv and x_test.csv in the format of the real ones."""
     train_ids = np.array([10, 11, 12, 13])
     test_ids = np.array([20, 21])
     if y_ids is None:
@@ -39,14 +34,13 @@ def test_cache_round_trip(tmp_path):
     x_train, x_test, y_train, tr_ids, te_ids, names = load_data(cache, tmp_path)
     assert cache.exists()
     assert x_train.shape == (4, 3) and x_test.shape == (2, 3)
-    # Empty fields become NaN, exactly as in load_csv_data
     assert np.isnan(x_train[1, 1]) and np.isnan(x_train[2, 2])
     np.testing.assert_array_equal(y_train, [-1, 1, -1, -1])
     np.testing.assert_array_equal(tr_ids, train_ids)
     np.testing.assert_array_equal(te_ids, test_ids)
     assert list(names) == ["_STATE", "GENHLTH", "_BMI5"]
 
-    # Second call: the cache is read, the CSVs are not needed anymore
+    # second call: reads the cache, the CSVs are no longer needed
     for name in ("x_train.csv", "x_test.csv", "y_train.csv"):
         os.remove(tmp_path / name)
     x_train2 = load_data(cache, tmp_path)[0]
@@ -54,7 +48,6 @@ def test_cache_round_trip(tmp_path):
 
 
 def test_label_order_is_checked(tmp_path):
-    # y_train.csv with the rows in a different order than x_train.csv
     write_fake_dataset(tmp_path, y_ids=np.array([11, 10, 12, 13]))
     with pytest.raises(ValueError, match="same order"):
         build_cache(tmp_path, tmp_path / "data.npz")

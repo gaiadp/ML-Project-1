@@ -1,14 +1,6 @@
-"""Load the dataset from the CSV files once, then reuse a NumPy cache in build/.
+"""Load the dataset from the CSV files once and cache it in build/data.npz.
 
-np.genfromtxt (used by helpers.load_csv_data) needs about a minute for x_train.csv;
-np.load on the cached arrays takes a few seconds. build/ and dataset/ are gitignored.
-
-Build the cache once, from the repository root:
-    python -m src.data
-
-Then, in any script run from the repository root (python run.py, python -m ...):
-    from src.data import load_data
-    x_train, x_test, y_train, train_ids, test_ids, feature_names = load_data()
+Build the cache from the repository root with:  python -m src.data
 """
 
 import csv
@@ -23,15 +15,13 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_DIR = os.path.join(ROOT, "dataset")
 CACHE_PATH = os.path.join(ROOT, "build", "data.npz")
 
-# Order of the arrays returned by load_data (same as load_csv_data, plus the names)
 KEYS = ("x_train", "x_test", "y_train", "train_ids", "test_ids", "feature_names")
 
 
 def read_feature_names(csv_path):
     """Return the column names of a data CSV without "Id", as a 1D array of str.
 
-    They are in the same order as the columns of the x returned by load_csv_data,
-    which drops the Id column: feature_names[j] is the name of x[:, j].
+    feature_names[j] is the name of column j of the x returned by load_csv_data.
     """
     with open(csv_path, newline="") as f:
         header = next(csv.reader(f))
@@ -39,15 +29,13 @@ def read_feature_names(csv_path):
 
 
 def build_cache(data_path=DATA_DIR, cache_path=CACHE_PATH):
-    """Read the CSVs with load_csv_data and save all arrays to cache_path (.npz).
+    """Read the CSVs with load_csv_data and save all arrays to cache_path.
 
-    Before saving, checks that x_train.csv and x_test.csv have the same columns and
-    that the rows of y_train.csv are in the same order as those of x_train.csv
-    (load_csv_data reads the labels without their Id column, so a different order
-    would silently assign the wrong label to each person).
+    Raises ValueError if x_train.csv and x_test.csv have different columns or if
+    y_train.csv is not in the same row order as x_train.csv.
 
     Returns:
-        the dict of arrays that was saved, with the keys in KEYS
+        dict of the saved arrays, with the keys in KEYS
     """
     x_train, x_test, y_train, train_ids, test_ids = load_csv_data(data_path)
 
@@ -58,6 +46,7 @@ def build_cache(data_path=DATA_DIR, cache_path=CACHE_PATH):
     if len(feature_names) != x_train.shape[1]:
         raise ValueError("header length does not match the number of columns")
 
+    # load_csv_data reads the labels without their Id: check the row order
     y_ids = np.genfromtxt(
         os.path.join(data_path, "y_train.csv"),
         delimiter=",",
@@ -77,7 +66,7 @@ def build_cache(data_path=DATA_DIR, cache_path=CACHE_PATH):
         feature_names=feature_names,
     )
     os.makedirs(os.path.dirname(cache_path), exist_ok=True)
-    # Uncompressed: about 1.1 GB on disk, but np.load just reads it back (fast)
+    # uncompressed: larger on disk (~1.1 GB) but fast to reload
     np.savez(cache_path, **arrays)
     return arrays
 
@@ -85,8 +74,7 @@ def build_cache(data_path=DATA_DIR, cache_path=CACHE_PATH):
 def load_data(cache_path=CACHE_PATH, data_path=DATA_DIR):
     """Return (x_train, x_test, y_train, train_ids, test_ids, feature_names).
 
-    Reads the cache if it exists, otherwise builds it first from the CSVs (slow,
-    only the first time). Labels are in {-1, 1}, as returned by load_csv_data.
+    Reads the cache, building it first from the CSVs if it does not exist.
     """
     if not os.path.exists(cache_path):
         build_cache(data_path, cache_path)
