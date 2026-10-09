@@ -252,7 +252,9 @@ def codes_to_nan(x, names):
     x : np.ndarray, shape (N, D), raw data (Id column already removed)
     names : sequence of str, the D column names (header of x_train.csv without "Id")
     """
-    x = x.astype(float).copy()
+    # astype already returns a new array (copy=True by default): the caller's x is
+    # left untouched without a second .copy(), which would cost another ~840 MB
+    x = x.astype(float)
     for col, (missing, zero) in special_code_rules(names).items():
         if missing:
             x[np.isin(x[:, col], list(missing)), col] = np.nan
