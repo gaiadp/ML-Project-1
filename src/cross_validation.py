@@ -27,11 +27,11 @@ def ridge_weights_svd(y, tx, lambdas):
     """
     n = tx.shape[0]
     u, s, vt = np.linalg.svd(tx, full_matrices=False)
-    uty = u.T @ y                                               # (r,)
+    uty = u.T @ y  # (r,)
     lambdas = np.asarray(lambdas, dtype=float)
     # shrinkage factors s / (s^2 + 2 N lambda), one row per lambda: (L, r)
-    factors = s / (s ** 2 + 2 * n * lambdas[:, None])
-    return (factors * uty) @ vt                                 # (L, D)
+    factors = s / (s**2 + 2 * n * lambdas[:, None])
+    return (factors * uty) @ vt  # (L, D)
 
 
 def cross_validation_ridge(y, tx, lambdas, k_fold=5, seed=1):
@@ -56,7 +56,7 @@ def cross_validation_ridge(y, tx, lambdas, k_fold=5, seed=1):
         x_tr, y_tr = tx[train_idx], y[train_idx]
         x_va, y_va = tx[val_idx], y[val_idx]
 
-        w_all = ridge_weights_svd(y_tr, x_tr, lambdas)          # (L, D)
+        w_all = ridge_weights_svd(y_tr, x_tr, lambdas)  # (L, D)
         # predictions for every lambda at once: (n_samples, L)
         train_losses[k] = np.mean((y_tr[:, None] - x_tr @ w_all.T) ** 2, axis=0) / 2
         val_losses[k] = np.mean((y_va[:, None] - x_va @ w_all.T) ** 2, axis=0) / 2
