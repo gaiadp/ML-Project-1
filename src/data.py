@@ -1,17 +1,22 @@
 """Load the dataset from the CSV files once and cache it in build/data.npz.
 
-Build the cache from the repository root with:  python -m src.data
+Build the cache with the Run button on this file, or:  python src/data.py
 """
 
 import csv
 import os
+import sys
 import time
 
 import numpy as np
 
-from helpers import load_csv_data
-
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# repository root on the import path, so that the Run button (python src/data.py) works
+if ROOT not in sys.path:
+    sys.path.insert(0, ROOT)
+
+from helpers import load_csv_data  # noqa: E402
+
 DATA_DIR = os.path.join(ROOT, "dataset")
 CACHE_PATH = os.path.join(ROOT, "build", "data.npz")
 
