@@ -17,12 +17,16 @@ import pytest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from implementations import (  # noqa: E402
+    calculate_gradient,
+    calculate_loss,
     least_squares,
     logistic_regression,
     mean_squared_error_gd,
     mean_squared_error_sgd,
+    penalized_logistic_regression,
     reg_logistic_regression,
     ridge_regression,
+    sigmoid,
 )
 
 N, D = 200, 5
@@ -249,3 +253,95 @@ def test_reg_logistic_loss_excludes_penalty(classification_data):
     w, loss = reg_logistic_regression(y, tx, lambda_, np.zeros(D), 50, 0.5)
     np.testing.assert_allclose(loss, logistic_loss(y, tx, w))
     assert not np.isclose(loss, logistic_loss(y, tx, w) + lambda_ * w @ w)
+
+
+# ---------------------------------------------------------------------------
+# 7. Logistic regression: lab ex05 values, public grader values, numerical
+#    stability, initial_w left untouched
+# ---------------------------------------------------------------------------
+
+
+def test_logistic_helpers_match_lab_ex05():
+    # Same inputs as the doctests of lab ex05, with 1D arrays instead of (N, 1)
+    np.testing.assert_allclose(sigmoid(np.array([0.1, 0.1])), [0.52497919] * 2)
+    y = np.array([0.0, 1.0])
+    tx = np.arange(4).reshape(2, 2)
+    np.testing.assert_allclose(calculate_loss(y, tx, np.array([2.0, 3.0])), 1.52429481)
+    tx = np.arange(6).reshape(2, 3)
+    w = np.array([0.1, 0.2, 0.3])
+    np.testing.assert_allclose(
+        calculate_gradient(y, tx, w), [-0.10370763, 0.2067104, 0.51712843], rtol=1e-6
+    )
+    np.testing.assert_allclose(
+        penalized_logistic_regression(y, tx, w, 0.1),
+        [-0.08370763, 0.2467104, 0.57712843],
+        rtol=1e-6,
+    )
+    # One GD step with gamma=0.1 gives the same w as the lab...
+    w1, loss1 = logistic_regression(y, tx, w, 1, 0.1)
+    np.testing.assert_allclose(w1, [0.11037076, 0.17932896, 0.24828716], rtol=1e-6)
+    w1_reg, _ = reg_logistic_regression(y, tx, 0.1, w, 1, 0.1)
+    np.testing.assert_allclose(w1_reg, [0.10837076, 0.17532896, 0.24228716], rtol=1e-6)
+    # ...but the lab returned the loss at the OLD w (0.62137268), we return it at w1
+    np.testing.assert_allclose(logistic_regression(y, tx, w, 0, 0.1)[1], 0.62137268)
+    np.testing.assert_allclose(loss1, calculate_loss(y, tx, w1))
+
+
+@pytest.fixture
+def public_data():
+    """Data of the public grading tests (projects/project1/grading_tests)."""
+    y = (np.array([0.1, 0.3, 0.5]) > 0.2) * 1.0
+    tx = np.array([[2.3, 3.2], [1.0, 0.1], [1.4, 2.3]])
+    return y, tx
+
+
+def test_logistic_public_values(public_data):
+    y, tx = public_data
+    w, loss = logistic_regression(y, tx, np.array([0.5, 1.0]), 2, 0.1)
+    np.testing.assert_allclose(w, [0.378561, 0.801131], rtol=1e-4)
+    np.testing.assert_allclose(loss, 1.348358, rtol=1e-4)
+
+
+def test_reg_logistic_public_values(public_data):
+    y, tx = public_data
+    w, loss = reg_logistic_regression(y, tx, 1.0, np.array([0.5, 1.0]), 2, 0.1)
+    np.testing.assert_allclose(w, [0.216062, 0.467747], rtol=1e-4)
+    np.testing.assert_allclose(loss, 0.972165, rtol=1e-4)
+
+
+def test_logistic_no_overflow_for_large_scores():
+    # Scores z = tx @ w of +-1e4: the lab formulas overflow in exp(-z) and take
+    # log(0). Overflow, division by zero and NaN are turned into errors here.
+    y = np.array([0.0, 1.0, 0.0, 1.0])
+    tx = np.array([[1.0, 1e4], [1.0, -1e4], [1.0, 5e3], [1.0, -5e3]])
+    w0 = np.array([0.0, 1.0])
+    with np.errstate(over="raise", divide="raise", invalid="raise", under="ignore"):
+        probs = sigmoid(tx @ w0)
+        w, loss = reg_logistic_regression(y, tx, 0.1, w0, 3, 1e-6)
+        loss0 = logistic_regression(y, tx, w0, 0, 0.1)[1]
+    np.testing.assert_allclose(probs, [1.0, 0.0, 1.0, 0.0])
+    assert np.isfinite(loss) and np.all(np.isfinite(w))
+    # Every point is misclassified with margin |z|, so each loss term is ~|z|
+    np.testing.assert_allclose(loss0, 7500.0)
+
+
+@pytest.mark.parametrize("max_iters", [0, 5])
+def test_logistic_does_not_modify_initial_w(classification_data, max_iters):
+    y, tx = classification_data
+    w0 = np.random.default_rng(7).normal(size=D)
+    w0_before = w0.copy()
+    w, _ = logistic_regression(y, tx, w0, max_iters, 0.5)
+    w_reg, _ = reg_logistic_regression(y, tx, 0.1, w0, max_iters, 0.5)
+    np.testing.assert_array_equal(w0, w0_before)
+    # The returned arrays are new objects, not the caller's initial_w
+    assert w is not w0 and w_reg is not w0
+
+
+def test_logistic_gd_decreases_loss(classification_data):
+    y, tx = classification_data
+    w0 = np.zeros(D)
+    loss0 = logistic_regression(y, tx, w0, 0, 0.5)[1]
+    loss100 = logistic_regression(y, tx, w0, 100, 0.5)[1]
+    # With w = 0 every probability is 1/2, so the loss is log 2
+    np.testing.assert_allclose(loss0, np.log(2))
+    assert loss100 < loss0

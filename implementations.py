@@ -104,11 +104,158 @@ def ridge_regression(y, tx, lambda_):
     return w, loss
 
 
+# ---------------------------------------------------------------------------
+# Logistic regression, adapted from the solution of lab ex05
+# ---------------------------------------------------------------------------
+# Same functions and names as in the lab, with these differences:
+# - y, w and the gradient are 1D arrays of shape (N,) / (D,), not (N, 1) / (D, 1);
+# - sigmoid and loss use np.logaddexp, so no overflow of exp and no log(0);
+# - the step functions return only the new w: the loss is computed once, at the
+#   LAST w, instead of at the old w before every update;
+# - w is never updated in place (w = w - ..., not w -= ...), so the caller's
+#   initial_w is never modified.
+
+
+def sigmoid(t):
+    """Apply the sigmoid function sigma(t) = 1 / (1 + exp(-t)) elementwise.
+
+    Numerically stable form: log(1 + exp(-t)) = logaddexp(0, -t), hence
+    sigma(t) = exp(-logaddexp(0, -t)). The exponent is always <= 0, so exp never
+    overflows, while the direct formula overflows in exp(-t) for very negative t.
+
+    Args:
+        t: scalar or numpy array
+
+    Returns:
+        scalar or numpy array of the same shape, with values in [0, 1]
+    """
+    return np.exp(-np.logaddexp(0, -t))
+
+
+def calculate_loss(y, tx, w):
+    """Compute the logistic loss (mean negative log-likelihood), y in {0, 1}.
+
+    With z = tx @ w and sigma(z) the predicted probability of class 1:
+        -[y log sigma(z) + (1 - y) log(1 - sigma(z))] = log(1 + exp(z)) - y z,
+    evaluated with np.logaddexp(0, z) = log(1 + exp(z)), which never overflows and
+    never takes log(0) (the lab formula does when sigma(z) rounds to 0 or 1).
+
+    Args:
+        y: labels in {0, 1}, shape=(N,)
+        tx: feature matrix, shape=(N, D)
+        w: weights, shape=(D,)
+
+    Returns:
+        loss: non-negative scalar (0-dimensional numpy float)
+    """
+    z = tx @ w
+    return np.mean(np.logaddexp(0, z) - y * z)
+
+
+def calculate_gradient(y, tx, w):
+    """Compute the gradient of the logistic loss: tx^T (sigma(tx @ w) - y) / N.
+
+    Args:
+        y: labels in {0, 1}, shape=(N,)
+        tx: feature matrix, shape=(N, D)
+        w: weights, shape=(D,)
+
+    Returns:
+        gradient: shape=(D,)
+    """
+    pred = sigmoid(tx @ w)
+    return tx.T @ (pred - y) / y.shape[0]
+
+
+def learning_by_gradient_descent(y, tx, w, gamma):
+    """Do one step of gradient descent on the logistic loss and return the new w.
+
+    Args:
+        y: labels in {0, 1}, shape=(N,)
+        tx: feature matrix, shape=(N, D)
+        w: current weights, shape=(D,), not modified
+        gamma: step size
+
+    Returns:
+        w: updated weights, shape=(D,) (a new array)
+    """
+    return w - gamma * calculate_gradient(y, tx, w)
+
+
+def penalized_logistic_regression(y, tx, w, lambda_):
+    """Return the gradient of the penalized objective L(w) + lambda_ * ||w||^2.
+
+    The derivative of lambda_ * w^T w is 2 * lambda_ * w. All weights, bias
+    included, are penalized, as in the lab and in the project description. The
+    loss returned by reg_logistic_regression is calculate_loss, without penalty.
+
+    Args:
+        y: labels in {0, 1}, shape=(N,)
+        tx: feature matrix, shape=(N, D)
+        w: weights, shape=(D,)
+        lambda_: regularization parameter
+
+    Returns:
+        gradient: shape=(D,)
+    """
+    return calculate_gradient(y, tx, w) + 2 * lambda_ * w
+
+
+def learning_by_penalized_gradient(y, tx, w, gamma, lambda_):
+    """Do one step of gradient descent on the penalized objective, return the new w.
+
+    Args:
+        y: labels in {0, 1}, shape=(N,)
+        tx: feature matrix, shape=(N, D)
+        w: current weights, shape=(D,), not modified
+        gamma: step size
+        lambda_: regularization parameter
+
+    Returns:
+        w: updated weights, shape=(D,) (a new array)
+    """
+    return w - gamma * penalized_logistic_regression(y, tx, w, lambda_)
+
+
 def logistic_regression(y, tx, initial_w, max_iters, gamma):
-    """Logistic regression using gradient descent (y in {0, 1})."""
-    raise NotImplementedError
+    """Logistic regression using gradient descent (y in {0, 1}).
+
+    Args:
+        y: labels in {0, 1}, shape=(N,)
+        tx: feature matrix, shape=(N, D)
+        initial_w: initial weights, shape=(D,), not modified
+        max_iters: number of GD steps
+        gamma: step size
+
+    Returns:
+        w: weights after the last step, shape=(D,)
+        loss: logistic loss at the returned w (max_iters=0: initial_w and its loss)
+    """
+    # np.array makes a copy: even with max_iters=0 the returned w is a new array
+    w = np.array(initial_w, dtype=float)
+    for _ in range(max_iters):
+        w = learning_by_gradient_descent(y, tx, w, gamma)
+    loss = calculate_loss(y, tx, w)
+    return w, loss
 
 
 def reg_logistic_regression(y, tx, lambda_, initial_w, max_iters, gamma):
-    """Regularized logistic regression using GD (y in {0, 1}, penalty lambda_ * ||w||^2)."""
-    raise NotImplementedError
+    """Regularized logistic regression using GD (y in {0, 1}, penalty lambda_ ||w||^2).
+
+    Args:
+        y: labels in {0, 1}, shape=(N,)
+        tx: feature matrix, shape=(N, D)
+        lambda_: regularization parameter
+        initial_w: initial weights, shape=(D,), not modified
+        max_iters: number of GD steps
+        gamma: step size
+
+    Returns:
+        w: weights after the last step, shape=(D,)
+        loss: logistic loss at the returned w, WITHOUT the penalty term
+    """
+    w = np.array(initial_w, dtype=float)
+    for _ in range(max_iters):
+        w = learning_by_penalized_gradient(y, tx, w, gamma, lambda_)
+    loss = calculate_loss(y, tx, w)
+    return w, loss
