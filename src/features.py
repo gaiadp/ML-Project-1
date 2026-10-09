@@ -35,7 +35,7 @@ def one_hot_encode(x_col, categories=None):
 
 def build_poly(x_col, degree):
     """Polynomial expansion of a single numeric column: [x, x^2, ..., x^degree]."""
-    return np.hstack([(x_col ** d)[:, None] for d in range(1, degree + 1)])
+    return np.hstack([(x_col**d)[:, None] for d in range(1, degree + 1)])
 
 
 def pairwise_products(x, col_pairs):
