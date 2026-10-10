@@ -65,3 +65,28 @@ def cross_validation_ridge(y, tx, lambdas, k_fold=5, seed=1):
     mean_train = train_losses.mean(axis=0)
     best_lambda = lambdas[np.argmin(mean_val)]
     return best_lambda, mean_val, mean_train
+
+
+def stratified_split(y, val_ratio=0.2, seed=1):
+    """Split range(len(y)) into train / validation indices, stratified by class.
+
+    The same fraction val_ratio of the positives (label 1) and of the negatives goes to
+    validation, so both parts keep the class proportions of y.
+
+    Args:
+        y: labels, shape=(N,), positive class = 1
+        val_ratio: fraction of each class put in the validation set
+        seed: seed of the random permutation
+
+    Returns:
+        train_idx, val_idx: sorted 1D index arrays, disjoint, together range(N)
+    """
+    rng = np.random.default_rng(seed)
+    is_pos = np.asarray(y) == 1
+    train_parts, val_parts = [], []
+    for idx in (np.flatnonzero(is_pos), np.flatnonzero(~is_pos)):
+        idx = rng.permutation(idx)
+        n_val = int(round(val_ratio * len(idx)))
+        val_parts.append(idx[:n_val])
+        train_parts.append(idx[n_val:])
+    return np.sort(np.concatenate(train_parts)), np.sort(np.concatenate(val_parts))
