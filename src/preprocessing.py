@@ -20,6 +20,8 @@ _R_3NONE = ({777, 999}, {555, 888})  # 3-digit quantity, 555 = never / 888 = non
 _R_4 = ({7777, 9999}, set())  # WEIGHT2, HEIGHT3
 _R_6 = ({777777, 999999}, set())  # dates mmyyyy
 _R_NONE = (set(), set())  # admin fields, weights, already-computed quantities
+_R_1NA = ({7, 8, 9}, set())  # 1-digit question, 8 = not applicable
+_R_1NEVER = ({7, 9}, {8})  # 1-digit frequency question, 8 = never / none
 
 _RULES = {
     # admin / design / weights / counts with no special codes
@@ -91,11 +93,8 @@ _RULES = {
             "ACTIN21_",
             "PADUR1_",
             "PADUR2_",
-            "PAFREQ1_",
-            "PAFREQ2_",
             "_MINAC11",
             "_MINAC21",
-            "STRFREQ_",
             "PAMIN11_",
             "PAMIN21_",
             "PA1MIN_",
@@ -122,7 +121,6 @@ _RULES = {
             "WHRTST10",
             "CRGVREL1",
             "CRGVPRB1",
-            "VINOCRE2",
             "HPVADSHT",
             "_CRACE1",
             "_CPRACE",
@@ -140,11 +138,7 @@ _RULES = {
             "CHILDREN",
             "DRNK3GE5",
             "DOCTDIAB",
-            "CHKHEMO3",
             "FEETCHK",
-            "ASERVIST",
-            "ASDRVIST",
-            "ASRCHKUP",
             "ADPLEASR",
             "ADDOWN",
             "ADSLEEP",
@@ -156,12 +150,28 @@ _RULES = {
         ],
         _R_2DAYS,
     ),
+    # 98 = never heard of the A1C test: unknown number of tests
+    "CHKHEMO3": ({77, 98, 99}, {88}),
+    # visits 1-87 (77 is a real count), 88 = none, 98 = don't know, 99 = refused
+    **dict.fromkeys(["ASERVIST", "ASDRVIST", "ASRCHKUP"], ({98, 99}, {88})),
     # ages 1-97: 98 = don't know, 99 = refused
-    **dict.fromkeys(["DIABAGE2", "ASTHMAGE"], ({98, 99}, set())),
+    "DIABAGE2": ({98, 99}, set()),
+    # ages 11-96: 97 = "10 or younger", no exact age
+    "ASTHMAGE": ({97, 98, 99}, set()),
     # hours of care per week: 97 = don't know, 98 = zero, 99 = refused
     **dict.fromkeys(["SCNTWRK1", "SCNTLWK1"], ({97, 99}, {98})),
-    # 3-digit coded quantities (1xx per day / 2xx per week / 3xx per month ...)
-    **dict.fromkeys(["EXEROFT1", "EXEROFT2", "EXERHMM1", "EXERHMM2"], _R_3),
+    # frequency scales 1..5 (or 1..6) where 8 = never / none comes before 1
+    **dict.fromkeys(["ASYMPTOM", "ASNOSLEP", "ASTHMED3", "ASINHALR"], _R_1NEVER),
+    # 8 = not applicable (never in a car, blind, ...), not a point of the scale
+    **dict.fromkeys(
+        ["SEATBELT", "SCNTMNY1", "SCNTMEL1", "VIEYEXM2", "VIINSUR2"], _R_1NA
+    ),
+    # 6 = unable for other reasons than eyesight, 8 = blind
+    **dict.fromkeys(["VIDFCLT2", "VIREDIF3"], ({6, 7, 8, 9}, set())),
+    "VINOCRE2": ({8, 77, 99}, set()),
+    # 3-digit coded quantities (1xx per day / 2xx per week / 3xx per month ...);
+    # LONGWTCH 555 = "all my life" is kept for the unit conversion, it is not 0
+    **dict.fromkeys(["EXEROFT1", "EXEROFT2", "EXERHMM1", "EXERHMM2", "LONGWTCH"], _R_3),
     **dict.fromkeys(
         [
             "ALCDAY5",
@@ -173,8 +183,7 @@ _RULES = {
             "VEGETAB1",
             "STRENGTH",
             "BLDSUGAR",
-            "FEETCHK2",
-            "LONGWTCH",
+            "FEETCHK2",  # 555 = no feet: 0 checks
             "ASACTLIM",
         ],
         _R_3NONE,
@@ -186,8 +195,11 @@ _RULES = {
     "_AGE65YR": ({3}, set()),
     "DROCDY3_": ({900}, set()),
     "_DRNKWEK": ({99900}, set()),
+    # codebook codes with the implied decimals already applied in the data:
+    # 99900 / 100 = 999, 99000 / 1000 = 99 (legal values stop at 98.999)
     "MAXVO2_": ({999}, set()),
     "FC60_": ({999}, set()),
+    **dict.fromkeys(["PAFREQ1_", "PAFREQ2_", "STRFREQ_"], ({99}, set())),
     **dict.fromkeys(
         [
             "_CHISPNC",

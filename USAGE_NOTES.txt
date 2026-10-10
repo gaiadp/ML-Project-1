@@ -32,6 +32,14 @@ src/ e implementations.py. Ogni punto indica dove si trova il codice interessato
   -> se si aggiunge o toglie una colonna prima di chiamarla, i nomi devono seguire.
 - Codici "nessuno/mai" (88, 555, 888, per alcune colonne 98) diventano 0, NON NaN:
   "88 giorni di cattiva salute" in realta' significa 0 giorni.
+- Lo stesso codice 8 ha significati diversi (regole controllate col codebook, ott. 10):
+  "mai/nessuno" -> 0 (ASYMPTOM, ASTHMED3, ...), "non applicabile" -> NaN (SEATBELT,
+  SCNTMNY1, ...), oppure una risposta vera fuori ordine (CHECKUP1, EYEEXAM: 8 = mai,
+  va dopo 4; da riordinare nella pipeline). Anche 98 cambia: "non so" nelle visite
+  per asma (ASERVIST, ...), "zero" in SCNTWRK1.
+- Nei dati i decimali impliciti del codebook sono GIA' applicati (WTKG3 in kg, HTM4 in
+  metri, _BMI5, PAFREQ1_ volte/settimana), tranne DROCDY3_ e _DRNKWEK (ancora x100).
+  Quindi anche i codici sono divisi: PAFREQ1_ 99 = codice 99000 "non so".
 - Le colonne a 3 cifre hanno UNITA' MISTE e non sono ancora convertite:
   ALCDAY5 (1xx = a settimana, 2xx = al mese), FRUIT1, FVBEANS, VEGETAB1, ...
   (1xx/2xx/3xx = al giorno/settimana/mese), EXEROFT1/2, STRENGTH, WEIGHT2 (9xxx = kg),

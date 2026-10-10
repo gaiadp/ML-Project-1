@@ -8,10 +8,17 @@ columns, MICHD signal of the columns dropped for domain reasons (DOMAIN_DROP).
 
 Feature types (feature_types_table): the type of each column in FEATURE_TYPES,
 next to an automatic guess from its values, to review the choices made by hand.
+
+Special codes (special_codes_audit): what codes_to_nan changes in each column, and
+the code-like values it keeps (real answers that need care, or missing rules).
+
+Missing values (missingness_analysis): how many, label leakage scan, groups of
+columns missing together, MICHD prevalence when a value is missing.
 """
 
 import os
 import sys
+import textwrap
 
 import numpy as np
 
@@ -33,9 +40,11 @@ from src.feature_types import (  # noqa: E402
     ORDINAL,
     TYPES,
 )
+from src.plots import plot_missing_and_balance  # noqa: E402
 from src.preprocessing import codes_to_nan, special_code_rules  # noqa: E402
 
 EDA_DIR = os.path.join(ROOT, "build", "eda")
+FIGURES_DIR = os.path.join(ROOT, "report", "figures")
 
 # near-constant: one value (or NaN) in more than this share of the rows
 NEAR_CONSTANT_SHARE = 0.99
@@ -66,6 +75,25 @@ DOMAIN_UNDECIDED = {
 
 # automatic guess for ordinal or nominal: only the codebook tells them apart
 CATEGORICAL = "categorical"
+
+# values that are often BRFSS codes (don't know, refused, none, not applicable)
+SUSPICIOUS_CODES = {7, 8, 9, 77, 87, 88, 97, 98, 99, 555, 777, 888, 999, 7777, 9999}
+
+# columns missing together: correlation of their NaN masks above this
+MISSING_CORR = 0.9
+# leakage scan: a value (or NaN) of at least LEAK_MIN_SIZE rows with a MICHD
+# prevalence of LEAK_PREVALENCE or more (the base rate is 8.8%)
+LEAK_MIN_SIZE = 30
+LEAK_PREVALENCE = 0.5
+# upper bounds of the NaN-fraction classes in the missingness summary
+NAN_CLASSES = (
+    (0.0, "0"),
+    (0.05, "<=5%"),
+    (0.5, "5-50%"),
+    (0.9, "50-90%"),
+    (0.99, "90-99%"),
+    (1.0, ">99%"),
+)
 
 
 def fmt_value(v):
@@ -129,13 +157,13 @@ def constancy_status(profile):
     return ""
 
 
-def prevalence_by_group(col, y01, n_bins=10):
+def prevalence_by_group(col, y01, n_bins=10, min_size=MIN_GROUP_SIZE):
     """MICHD prevalence per value of the column, or per decile when it has more than
     MAX_GROUP_VALUES distinct values, plus one group for NaN.
 
     Returns:
         list of (label, n_rows, prevalence), without the groups smaller than
-        MIN_GROUP_SIZE
+        min_size
     """
     nan = np.isnan(col)
     values = np.unique(col[~nan])
@@ -157,7 +185,7 @@ def prevalence_by_group(col, y01, n_bins=10):
     result = []
     for label, mask in groups:
         n = int(mask.sum())
-        if n >= MIN_GROUP_SIZE:
+        if n >= min_size:
             result.append((label, n, y01[mask].mean()))
     return result
 
@@ -382,6 +410,239 @@ def feature_types_table(x_clean, names):
     print(f"auto differs from the hand-made types: {n_differ}, full table: {path}")
 
 
+def special_codes_audit(x_raw, x_clean, y01, names):
+    """Check of codes_to_nan, column by column. Saves build/eda/special_codes.txt.
+
+    First table: how many answers codes_to_nan turns into NaN and into 0.
+    Second table: values it keeps that are usual BRFSS codes (SUSPICIOUS_CODES) and
+    are not next to the other answers (e.g. 8 after 1..4). Each one is either a real
+    answer that needs care (an ordinal to reorder) or a rule missing in _RULES.
+    The MICHD prevalence is shown to judge them; it is not used by the pipeline.
+    """
+    names = list(names)
+    rules = special_code_rules(names)
+    changed, kept = [], []
+    for j, name in enumerate(names):
+        if FEATURE_TYPES[name] == DROP:
+            continue
+        raw, clean = x_raw[:, j], x_clean[:, j]
+        answered = ~np.isnan(raw)
+        n_nan = int(np.sum(answered & np.isnan(clean)))
+        n_zero = int(np.sum(answered & (raw != 0) & (clean == 0)))
+        missing, zero = rules[j]
+        rule = f"NaN {sorted(missing)}, 0 {sorted(zero)}"
+        if n_nan or n_zero:
+            changed.append(
+                f"{name:10s} {FEATURE_TYPES[name]:12s} {n_nan:8d} {n_zero:8d}  {rule}"
+            )
+
+        values = np.unique(clean[~np.isnan(clean)])
+        n_answered = int(np.sum(~np.isnan(clean)))
+        for k in range(1, len(values)):
+            v = values[k]
+            # a code is far from the previous answer: 8 after 1..4, 98 after 1..76
+            if v not in SUSPICIOUS_CODES or v - values[k - 1] <= 1:
+                continue
+            mask = clean == v
+            others = ~np.isnan(clean) & ~mask
+            kept.append(
+                f"{name:10s} {FEATURE_TYPES[name]:12s} {fmt_value(v):>6s} "
+                f"{int(mask.sum()):7d} {pct(mask.sum() / n_answered):>6s} "
+                f"{pct(y01[mask].mean()):>6s} {pct(y01[others].mean()):>6s}  {rule}"
+            )
+
+    lines = [
+        "Special codes: what codes_to_nan does (experiments/eda.py)",
+        "",
+        f"== Answers changed by codes_to_nan ({len(changed)} columns) ==",
+        f"{'column':10s} {'type':12s} {'->NaN':>8s} {'->0':>8s}  rule",
+        *changed,
+        "",
+        f"== Code-like values kept ({len(kept)}): real answers or missing rules ==",
+        "(% ans: share of the answered rows; MICHD %: prevalence for the value and"
+        " for the other answered rows)",
+        f"{'column':10s} {'type':12s} {'value':>6s} {'n':>7s} {'% ans':>6s} "
+        f"{'MICHD':>6s} {'others':>6s}  rule",
+        *kept,
+    ]
+    path = save_lines(lines, "special_codes.txt")
+    print(f"codes_to_nan changes {len(changed)} columns; {len(kept)} code-like values")
+    print(f"kept, to review: {path}")
+
+
+def count_nan_classes(nan_frac):
+    """Number of columns in each class of NAN_CLASSES."""
+    counts, low = [], -1.0
+    for high, _ in NAN_CLASSES:
+        counts.append(int(np.sum((nan_frac > low) & (nan_frac <= high))))
+        low = high
+    return counts
+
+
+def connected_groups(linked):
+    """Connected components of a symmetric boolean matrix linked, shape (D, D).
+
+    Returns:
+        list of groups (sorted lists of indices), largest first
+    """
+    seen = np.zeros(len(linked), dtype=bool)
+    groups = []
+    for start in range(len(linked)):
+        if seen[start]:
+            continue
+        seen[start] = True
+        stack, group = [start], []
+        while stack:
+            i = stack.pop()
+            group.append(i)
+            for k in np.flatnonzero(linked[i] & ~seen):
+                seen[k] = True
+                stack.append(k)
+        groups.append(sorted(group))
+    return sorted(groups, key=len, reverse=True)
+
+
+def missing_together(x_clean, cols):
+    """Groups of columns that are missing together (skip logic, optional modules):
+    two columns are linked when the correlation of their NaN masks is above
+    MISSING_CORR. cols: column indices with both NaN and answered rows.
+
+    Returns:
+        list of groups of indices into cols, largest first
+    """
+    # one float32 column per mask: ~330 MB instead of a float64 copy of x
+    masks = np.empty((len(x_clean), len(cols)), dtype=np.float32)
+    for k, j in enumerate(cols):
+        masks[:, k] = np.isnan(x_clean[:, j])
+    p = masks.mean(axis=0)
+    cov = masks.T @ masks / len(masks) - np.outer(p, p)
+    std = np.sqrt(p * (1 - p))
+    corr = cov / np.outer(std, std)
+    return connected_groups(corr > MISSING_CORR)
+
+
+def leakage_scan(x_clean, y01, names):
+    """Values (or NaN) of any column, dropped ones included, with a MICHD
+    prevalence of LEAK_PREVALENCE or more on at least LEAK_MIN_SIZE rows."""
+    lines = []
+    for j, name in enumerate(names):
+        col = x_clean[:, j]
+        for label, n, prev in prevalence_by_group(col, y01, min_size=LEAK_MIN_SIZE):
+            if prev >= LEAK_PREVALENCE:
+                lines.append(
+                    f"{name:10s} {FEATURE_TYPES[name]:12s} {label:>12s} {n:7d} "
+                    f"{pct(prev):>6s}"
+                )
+    return lines
+
+
+def missingness_analysis(x_raw, x_clean, y01, names):
+    """Missing values of the feature columns (DOMAIN_DROP excluded): how many, label
+    leakage scan, groups of columns missing together, and MICHD prevalence when a
+    value is missing. Saves build/eda/missingness.txt and the figure
+    report/figures/missing_balance.png.
+
+    Uses the labels: if is_missing indicators are chosen from this table, the choice
+    must be made inside fit_preprocess, on the training part of each fold.
+    """
+    names = list(names)
+    feats = [j for j, name in enumerate(names) if FEATURE_TYPES[name] != DROP]
+    frac_raw = np.array([np.isnan(x_raw[:, j]).mean() for j in feats])
+    # number of NaN per column after codes_to_nan, by column index
+    n_nan = {j: int(np.isnan(x_clean[:, j]).sum()) for j in feats}
+    frac = np.array([n_nan[j] for j in feats]) / len(y01)
+    header = "  ".join(f"{label:>6s}" for _, label in NAN_CLASSES)
+    raw_counts = "  ".join(f"{c:6d}" for c in count_nan_classes(frac_raw))
+    clean_counts = "  ".join(f"{c:6d}" for c in count_nan_classes(frac))
+    lines = [
+        "Missing values (experiments/eda.py)",
+        "",
+        f"== NaN per column ({len(feats)} feature columns, DOMAIN_DROP excluded) ==",
+        f"{'NaN fraction':24s} {header}",
+        f"{'raw':24s} {raw_counts}",
+        f"{'after codes_to_nan':24s} {clean_counts}",
+        f"mean NaN fraction: raw {pct(frac_raw.mean())}%, "
+        f"after codes_to_nan {pct(frac.mean())}%",
+    ]
+
+    leaks = leakage_scan(x_clean, y01, names)
+    lines += [
+        "",
+        f"== Leakage scan: MICHD >= {LEAK_PREVALENCE:.0%} on >= {LEAK_MIN_SIZE} rows"
+        " (all columns, dropped ones included) ==",
+        f"{'column':10s} {'type':12s} {'value':>12s} {'n':>7s} {'MICHD':>6s}",
+        *leaks,
+    ]
+
+    # columns with enough rows both missing and answered
+    n_rows = len(y01)
+    cols = [
+        j
+        for j in feats
+        if n_nan[j] >= MIN_GROUP_SIZE and n_rows - n_nan[j] >= MIN_GROUP_SIZE
+    ]
+    groups = [g for g in missing_together(x_clean, cols) if len(g) > 1]
+    lines += [
+        "",
+        "== Groups of columns missing together (NaN-mask correlation >"
+        f" {MISSING_CORR}, {len(cols)} columns with >= {MIN_GROUP_SIZE} NaN"
+        " and answered rows) ==",
+        "(MICHD %: prevalence when the first column is missing / answered)",
+    ]
+    for g in groups:
+        # members from the least to the most missing
+        members = sorted((cols[k] for k in g), key=lambda j: n_nan[j])
+        first = np.isnan(x_clean[:, members[0]])
+        low, high = n_nan[members[0]] / n_rows, n_nan[members[-1]] / n_rows
+        lines.append(
+            f"{len(members)} columns, NaN {pct(low)}-{pct(high)}%, "
+            f"MICHD {pct(y01[first].mean())}% missing / "
+            f"{pct(y01[~first].mean())}% answered"
+        )
+        text = ", ".join(names[j] for j in members)
+        lines.append(textwrap.indent(textwrap.fill(text, 84), "    "))
+
+    rows = []
+    for j in cols:
+        nan = np.isnan(x_clean[:, j])
+        p_nan, p_ans = y01[nan].mean(), y01[~nan].mean()
+        rows.append((abs(p_nan - p_ans), names[j], nan.mean(), p_nan, p_ans))
+    rows.sort(reverse=True)
+    lines += [
+        "",
+        f"== MICHD prevalence when missing vs answered ({len(rows)} columns,"
+        " sorted by the absolute difference) ==",
+        f"{'column':10s} {'type':12s} {'NaN%':>6s} {'missing':>8s} {'answered':>8s}"
+        f" {'diff':>6s}",
+    ]
+    for _, name, nan_frac, p_nan, p_ans in rows:
+        lines.append(
+            f"{name:10s} {FEATURE_TYPES[name]:12s} {pct(nan_frac):>6s} "
+            f"{pct(p_nan):>8s} {pct(p_ans):>8s} {100 * (p_nan - p_ans):+6.1f}"
+        )
+
+    row_nan = np.zeros(len(y01))
+    for j in feats:
+        row_nan += np.isnan(x_clean[:, j])
+    r = np.corrcoef(row_nan, y01)[0, 1]
+    lines += [
+        "",
+        f"== NaN per person (over the {len(feats)} feature columns) ==",
+        f"min {int(row_nan.min())}, median {int(np.median(row_nan))},"
+        f" max {int(row_nan.max())}; correlation with MICHD r = {r:.3f}",
+        "MICHD prevalence by number of NaN (deciles when it has many values):",
+    ]
+    for label, n, prev in prevalence_by_group(row_nan, y01):
+        lines.append(f"    {label:>12s}: {pct(prev):>5s}%  n={n}")
+
+    path = save_lines(lines, "missingness.txt")
+    os.makedirs(FIGURES_DIR, exist_ok=True)
+    figure = os.path.join(FIGURES_DIR, "missing_balance.png")
+    plot_missing_and_balance(frac, y01, figure)
+    print(f"leakage scan: {len(leaks)} values; {len(groups)} groups missing together")
+    print(f"tables: {path}, figure: {figure}")
+
+
 def main():
     x_train, x_test, y_train, train_ids, test_ids, names = load_data()
     test_shape = x_test.shape
@@ -391,6 +652,9 @@ def main():
         x_train, x_clean, y_train, test_shape, train_ids, test_ids, names
     )
     feature_types_table(x_clean, names)
+    y01 = (y_train == 1).astype(float)
+    special_codes_audit(x_train, x_clean, y01, names)
+    missingness_analysis(x_train, x_clean, y01, names)
 
 
 if __name__ == "__main__":
