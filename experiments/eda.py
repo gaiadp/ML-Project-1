@@ -5,6 +5,9 @@ Text tables go to build/eda/ (gitignored).
 
 Structural overview (structural_overview): shapes and ids, constant and near-constant
 columns, MICHD signal of the columns dropped for domain reasons (DOMAIN_DROP).
+
+Feature types (feature_types_table): the type of each column in FEATURE_TYPES,
+next to an automatic guess from its values, to review the choices made by hand.
 """
 
 import os
@@ -18,8 +21,19 @@ if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
 from src.data import load_data  # noqa: E402
-from src.feature_types import DOMAIN_DROP  # noqa: E402
-from src.preprocessing import codes_to_nan  # noqa: E402
+from src.feature_types import (  # noqa: E402
+    BINARY,
+    CONTINUOUS,
+    COUNT,
+    DOMAIN_DROP,
+    DROP,
+    FEATURE_TYPES,
+    MIXED_UNITS,
+    NOMINAL,
+    ORDINAL,
+    TYPES,
+)
+from src.preprocessing import codes_to_nan, special_code_rules  # noqa: E402
 
 EDA_DIR = os.path.join(ROOT, "build", "eda")
 
@@ -39,7 +53,6 @@ STATUS_ORDER = (
 )
 
 _HOUSEHOLD = "household size (living alone ~ age)"
-_CHILD = "random child module: describes a child, not the respondent"
 
 # Candidates to drop that the overview does not decide: their relation to MICHD does
 DOMAIN_UNDECIDED = {
@@ -48,16 +61,11 @@ DOMAIN_UNDECIDED = {
     "NUMMEN": _HOUSEHOLD,
     "NUMWOMEN": _HOUSEHOLD,
     "HHADULT": _HOUSEHOLD,
-    "QSTLANG": "interview language",
     "MSCODE": "metropolitan status (urban / rural)",
-    "RCSGENDR": _CHILD,
-    "RCSRLTN2": _CHILD,
-    "CASTHDX2": _CHILD,
-    "CASTHNO2": _CHILD,
-    "_CHISPNC": _CHILD,
-    "_CRACE1": _CHILD,
-    "_CPRACE": _CHILD,
 }
+
+# automatic guess for ordinal or nominal: only the codebook tells them apart
+CATEGORICAL = "categorical"
 
 
 def fmt_value(v):
@@ -293,6 +301,87 @@ def structural_overview(
     print(f"full tables: {path}")
 
 
+def propose_type(name, values, rule):
+    """Automatic guess of the type of a column, without the codebook.
+
+    Args:
+        name: column name
+        values: distinct non-NaN values of the column after codes_to_nan
+        rule: (missing codes, none codes) of the column, from special_code_rules
+
+    Returns:
+        one of TYPES, or CATEGORICAL for "ordinal or nominal"
+    """
+    missing, zero = rule
+    if name in DOMAIN_DROP:
+        return DROP
+    # 777 / 7777 / 777777 = "don't know" of the 3-, 4- and 6-digit coded answers
+    if missing & {777, 7777, 777777}:
+        return MIXED_UNITS
+    if 88 in zero:  # "number of days / times", 88 = none
+        return COUNT
+    if len(values) <= 2:
+        return BINARY
+    if np.any(values != np.round(values)) or len(values) > MAX_GROUP_VALUES:
+        return CONTINUOUS
+    return CATEGORICAL
+
+
+def types_agree(auto, final):
+    """True if the automatic guess is compatible with the type chosen by hand."""
+    return auto == final or (auto == CATEGORICAL and final in (ORDINAL, NOMINAL))
+
+
+def value_examples(values, n_show=8):
+    """Distinct values as short text: all of them, or the first ones and the last."""
+    if len(values) <= n_show:
+        return ", ".join(fmt_value(v) for v in values)
+    first = ", ".join(fmt_value(v) for v in values[: n_show - 2])
+    return f"{first} ... {fmt_value(values[-1])}"
+
+
+def feature_types_table(x_clean, names):
+    """Type of each column (FEATURE_TYPES) next to the automatic guess (propose_type),
+    with the values seen after codes_to_nan. Saves build/eda/feature_types.txt.
+
+    Uses no labels: the types are fixed lists that do not bias cross-validation.
+    """
+    names = list(names)
+    if list(FEATURE_TYPES) != names:
+        raise ValueError("FEATURE_TYPES must list the data columns in their order")
+
+    rules = special_code_rules(names)
+    rows = []
+    for j, name in enumerate(names):
+        col = x_clean[:, j]
+        values = np.unique(col[~np.isnan(col)])
+        final = FEATURE_TYPES[name]
+        auto = propose_type(name, values, rules[j])
+        rows.append((name, final, auto, np.isnan(col).mean(), values))
+
+    n_differ = sum(not types_agree(auto, final) for _, final, auto, _, _ in rows)
+    counts = ", ".join(f"{sum(r[1] == t for r in rows)} {t}" for t in TYPES)
+    lines = [
+        "Feature types (src/feature_types.FEATURE_TYPES, experiments/eda.py)",
+        f"(auto: guess from the values and the special codes, {CATEGORICAL} ="
+        " ordinal or nominal; * = auto differs from the type chosen by hand)",
+        f"types: {counts}",
+        f"auto differs: {n_differ}",
+        "",
+        f"{'column':10s} {'type':12s} {'auto':12s}   {'NaN%':>5s} {'values':>6s}"
+        "  examples (after codes_to_nan)",
+    ]
+    for name, final, auto, nan_frac, values in rows:
+        flag = " " if types_agree(auto, final) else "*"
+        lines.append(
+            f"{name:10s} {final:12s} {auto:12s} {flag} {pct(nan_frac):>5s} "
+            f"{len(values):6d}  {value_examples(values)}"
+        )
+    path = save_lines(lines, "feature_types.txt")
+    print(f"types: {counts}")
+    print(f"auto differs from the hand-made types: {n_differ}, full table: {path}")
+
+
 def main():
     x_train, x_test, y_train, train_ids, test_ids, names = load_data()
     test_shape = x_test.shape
@@ -301,6 +390,7 @@ def main():
     structural_overview(
         x_train, x_clean, y_train, test_shape, train_ids, test_ids, names
     )
+    feature_types_table(x_clean, names)
 
 
 if __name__ == "__main__":
