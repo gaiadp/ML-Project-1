@@ -57,7 +57,9 @@ def plot_missing_and_balance(missing_frac, y01, path):
     y01 : np.ndarray, shape (N,), labels in {0, 1} (1 = MICHD)
     path : str, output file (e.g. report/figures/missing_balance.png)
     """
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(9, 3), gridspec_kw={"width_ratios": [3, 1]})
+    fig, (ax1, ax2) = plt.subplots(
+        1, 2, figsize=(9, 3), gridspec_kw={"width_ratios": [3, 1]}
+    )
     ax1.hist(missing_frac, bins=40, color=C_DATA, edgecolor="white", linewidth=1)
     ax1.set_xlabel("fraction of missing values (NaN after cleaning)")
     ax1.set_ylabel("# features")
@@ -66,7 +68,15 @@ def plot_missing_and_balance(missing_frac, y01, path):
     counts = np.array([(y01 == 0).sum(), (y01 == 1).sum()])
     ax2.bar(["no MICHD", "MICHD"], counts, color=C_DATA, width=0.6)
     for i, c in enumerate(counts):
-        ax2.text(i, c, f"{c / counts.sum():.1%}", ha="center", va="bottom", fontsize=8, color=C_TEXT)
+        ax2.text(
+            i,
+            c,
+            f"{c / counts.sum():.1%}",
+            ha="center",
+            va="bottom",
+            fontsize=8,
+            color=C_TEXT,
+        )
     ax2.set_title("Class balance")
     ax2.grid(axis="x", visible=False)
     fig.savefig(path)
@@ -96,8 +106,14 @@ def plot_mi_vs_corr(names, mi, abs_r, path, n_labels=15):
     ax.scatter(abs_r, mi, s=14, color=C_DATA, alpha=0.7, edgecolors="none")
     idx = np.argsort(mi)[::-1][:n_labels]
     for i in idx:
-        ax.annotate(names[i], (abs_r[i], mi[i]), fontsize=7, color=C_TEXT,
-                    xytext=(3, 2), textcoords="offset points")
+        ax.annotate(
+            names[i],
+            (abs_r[i], mi[i]),
+            fontsize=7,
+            color=C_TEXT,
+            xytext=(3, 2),
+            textcoords="offset points",
+        )
     ax.set_xlabel("|Pearson r| with target (non-missing rows)")
     ax.set_ylabel("mutual information with target [bits]")
     ax.set_title("Linear vs total dependence")
@@ -123,7 +139,9 @@ def plot_dependence_grid(names, cols, y01, kinds, path, ncols=4, min_count=30):
     """
     n = len(cols)
     nrows = int(np.ceil(n / ncols))
-    fig, axes = plt.subplots(nrows, ncols, figsize=(3.1 * ncols, 2.4 * nrows), squeeze=False)
+    fig, axes = plt.subplots(
+        nrows, ncols, figsize=(3.1 * ncols, 2.4 * nrows), squeeze=False
+    )
     base = _logit(y01.mean())
 
     for ax, name, x, kind in zip(axes.flat, names, cols, kinds):
@@ -143,10 +161,19 @@ def plot_dependence_grid(names, cols, y01, kinds, path, ncols=4, min_count=30):
         p = np.array([yv[g].mean() if c else np.nan for g, c in zip(groups, cnt)])
         ok = cnt >= min_count
         lo, se = _logit(p[ok]), 1 / np.sqrt(cnt[ok] * p[ok] * (1 - p[ok]) + 1e-9)
-        ax.errorbar(pos[ok], lo, yerr=1.96 * se, fmt="o", ms=4, color=C_DATA,
-                    ecolor=C_DATA, elinewidth=1, capsize=0)
+        ax.errorbar(
+            pos[ok],
+            lo,
+            yerr=1.96 * se,
+            fmt="o",
+            ms=4,
+            color=C_DATA,
+            ecolor=C_DATA,
+            elinewidth=1,
+            capsize=0,
+        )
         if kind == "numeric" and ok.sum() >= 3:
-            w = 1 / se ** 2
+            w = 1 / se**2
             coef = np.polyfit(pos[ok], lo, 1, w=np.sqrt(w))
             xs = np.linspace(pos[ok].min(), pos[ok].max(), 50)
             ax.plot(xs, np.polyval(coef, xs), color=C_FIT, lw=1.5)
@@ -159,10 +186,24 @@ def plot_dependence_grid(names, cols, y01, kinds, path, ncols=4, min_count=30):
             span = (np.nanmax(pos) - np.nanmin(pos)) if np.isfinite(pos).any() else 1
             xn = xr + 0.12 * (span or 1)
             sen = 1 / np.sqrt(nan.sum() * pn * (1 - pn) + 1e-9)
-            ax.errorbar([xn], [_logit(pn)], yerr=1.96 * sen, fmt="o", ms=5, mfc="white",
-                        color=C_DATA, elinewidth=1)
-            ax.annotate("NaN", (xn, _logit(pn)), xytext=(4, -3), textcoords="offset points",
-                        fontsize=7, color=C_TEXT)
+            ax.errorbar(
+                [xn],
+                [_logit(pn)],
+                yerr=1.96 * sen,
+                fmt="o",
+                ms=5,
+                mfc="white",
+                color=C_DATA,
+                elinewidth=1,
+            )
+            ax.annotate(
+                "NaN",
+                (xn, _logit(pn)),
+                xytext=(4, -3),
+                textcoords="offset points",
+                fontsize=7,
+                color=C_TEXT,
+            )
 
         ax.axhline(base, color=C_MUTED, ls="--", lw=0.8)
         ax.set_title(f"{name}  ({kind}, {nan.mean():.0%} NaN)", fontsize=8.5)
@@ -170,8 +211,12 @@ def plot_dependence_grid(names, cols, y01, kinds, path, ncols=4, min_count=30):
         ax.set_visible(False)
     for ax in axes[:, 0]:
         ax.set_ylabel("log-odds MICHD")
-    fig.suptitle("Empirical log-odds per value/bin (dashed = overall prevalence, "
-                 "orange = linear fit)", fontsize=10, color=C_TEXT)
+    fig.suptitle(
+        "Empirical log-odds per value/bin (dashed = overall prevalence, "
+        "orange = linear fit)",
+        fontsize=10,
+        color=C_TEXT,
+    )
     fig.tight_layout()
     fig.savefig(path)
     plt.close(fig)

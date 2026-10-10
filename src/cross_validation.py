@@ -27,11 +27,11 @@ def ridge_weights_svd(y, tx, lambdas):
     """
     n = tx.shape[0]
     u, s, vt = np.linalg.svd(tx, full_matrices=False)
-    uty = u.T @ y                                               # (r,)
+    uty = u.T @ y  # (r,)
     lambdas = np.asarray(lambdas, dtype=float)
     # shrinkage factors s / (s^2 + 2 N lambda), one row per lambda: (L, r)
-    factors = s / (s ** 2 + 2 * n * lambdas[:, None])
-    return (factors * uty) @ vt                                 # (L, D)
+    factors = s / (s**2 + 2 * n * lambdas[:, None])
+    return (factors * uty) @ vt  # (L, D)
 
 
 def cross_validation_ridge(y, tx, lambdas, k_fold=5, seed=1):
@@ -56,7 +56,7 @@ def cross_validation_ridge(y, tx, lambdas, k_fold=5, seed=1):
         x_tr, y_tr = tx[train_idx], y[train_idx]
         x_va, y_va = tx[val_idx], y[val_idx]
 
-        w_all = ridge_weights_svd(y_tr, x_tr, lambdas)          # (L, D)
+        w_all = ridge_weights_svd(y_tr, x_tr, lambdas)  # (L, D)
         # predictions for every lambda at once: (n_samples, L)
         train_losses[k] = np.mean((y_tr[:, None] - x_tr @ w_all.T) ** 2, axis=0) / 2
         val_losses[k] = np.mean((y_va[:, None] - x_va @ w_all.T) ** 2, axis=0) / 2
@@ -65,3 +65,28 @@ def cross_validation_ridge(y, tx, lambdas, k_fold=5, seed=1):
     mean_train = train_losses.mean(axis=0)
     best_lambda = lambdas[np.argmin(mean_val)]
     return best_lambda, mean_val, mean_train
+
+
+def stratified_split(y, val_ratio=0.2, seed=1):
+    """Split range(len(y)) into train / validation indices, stratified by class.
+
+    The same fraction val_ratio of the positives (label 1) and of the negatives goes to
+    validation, so both parts keep the class proportions of y.
+
+    Args:
+        y: labels, shape=(N,), positive class = 1
+        val_ratio: fraction of each class put in the validation set
+        seed: seed of the random permutation
+
+    Returns:
+        train_idx, val_idx: sorted 1D index arrays, disjoint, together range(N)
+    """
+    rng = np.random.default_rng(seed)
+    is_pos = np.asarray(y) == 1
+    train_parts, val_parts = [], []
+    for idx in (np.flatnonzero(is_pos), np.flatnonzero(~is_pos)):
+        idx = rng.permutation(idx)
+        n_val = int(round(val_ratio * len(idx)))
+        val_parts.append(idx[:n_val])
+        train_parts.append(idx[n_val:])
+    return np.sort(np.concatenate(train_parts)), np.sort(np.concatenate(val_parts))
