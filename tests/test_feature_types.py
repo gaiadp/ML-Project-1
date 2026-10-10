@@ -5,7 +5,15 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from src.feature_types import DOMAIN_DROP, DROP, FEATURE_TYPES, TYPES  # noqa: E402
+from src.feature_types import (  # noqa: E402
+    CONTINUOUS,
+    CONVERTED,
+    DOMAIN_DROP,
+    DROP,
+    FEATURE_TYPES,
+    MIXED_UNITS,
+    TYPES,
+)
 
 # columns of x_train.csv without Id; a key repeated by mistake in the dict literal
 # silently replaces the first one, so the dict would be shorter
@@ -24,3 +32,9 @@ def test_drop_type_matches_domain_drop():
 
 def test_every_dropped_column_has_a_reason():
     assert all(isinstance(r, str) and r for r in DOMAIN_DROP.values())
+
+
+def test_converted_columns():
+    for raw, converted in CONVERTED.items():
+        assert FEATURE_TYPES[raw] == MIXED_UNITS
+        assert FEATURE_TYPES[converted] == CONTINUOUS

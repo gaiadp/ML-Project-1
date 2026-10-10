@@ -20,11 +20,12 @@ from src.data import ROOT, load_data
 from src.metrics import accuracy, best_threshold, f1_score, precision, recall
 from src.metrics import predict_labels
 from src.models import default_threshold, fit, predict_scores
-from src.pipeline import apply_preprocess, fit_preprocess
+from src.pipeline import V0_CONFIG, apply_preprocess, fit_preprocess
 
 SEED = 1
 VAL_RATIO = 0.2
-MAX_MISSING_FRAC = 0.5
+# preprocessing steps (src/pipeline.py): v0 until the full pipeline is validated in CV
+PIPELINE = V0_CONFIG
 METHOD = "ridge_regression"
 LAMBDA = 1e-4
 SUBMISSION_PATH = os.path.join(ROOT, "submissions", "submission.csv")
@@ -64,12 +65,15 @@ def main():
         f"val {len(va_idx)} ({np.mean(y_va == 1):.2%} pos)"
     )
 
-    params = fit_preprocess(x_tr, names, MAX_MISSING_FRAC)
-    tx_tr = apply_preprocess(x_tr, names, params)
+    state = fit_preprocess(x_tr, y_tr, names, PIPELINE)
+    tx_tr = apply_preprocess(x_tr, names, state)
     del x_tr
-    tx_va = apply_preprocess(x_va, names, params)
+    tx_va = apply_preprocess(x_va, names, state)
     del x_va
-    print(f"kept {params['keep'].sum()} of {len(names)} columns, tx {tx_tr.shape}")
+    print(
+        f"kept {len(state['cols'])} of {len(names)} columns "
+        f"+ {len(state['ind_cols'])} missing indicators, tx {tx_tr.shape}"
+    )
 
     w, loss = fit(METHOD, y_tr, tx_tr, lambda_=LAMBDA)
     print(f"{METHOD} (lambda={LAMBDA}): training loss {loss:.4f}")
@@ -83,7 +87,7 @@ def main():
     report("val, chosen threshold", y_va, predict_labels(scores_va, threshold))
     report("train, chosen threshold", y_tr, predict_labels(scores_tr, threshold))
 
-    tx_te = apply_preprocess(x_test, names, params)
+    tx_te = apply_preprocess(x_test, names, state)
     del x_test
     y_te_pred = predict_labels(predict_scores(METHOD, w, tx_te), threshold)
 

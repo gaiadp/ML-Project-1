@@ -7,6 +7,9 @@ of them carries.
 
 FEATURE_TYPES: the type of every column (one of TYPES), from the codebook. It decides
 how the pipeline encodes a column. Comments mark the codes that need care.
+
+CONVERTED: mixed-units columns that the dataset also provides already converted to
+one unit; the pipeline keeps only the converted column.
 """
 
 _ID_DATE = "interview id or date"
@@ -401,4 +404,24 @@ FEATURE_TYPES = {
     "_FLSHOT6": BINARY,  # age 65+ only
     "_PNEUMO2": BINARY,  # age 65+ only
     "_AIDTST3": BINARY,
+}
+
+# raw mixed-units column -> the same answer converted to one unit by the CDC.
+# The other mixed-units columns (BLDSUGAR, FEETCHK2, LONGWTCH, FLSHTMY2, HIVTSTD3)
+# have no converted version: src/preprocessing.convert_units converts them.
+CONVERTED = {
+    "WEIGHT2": "WTKG3",  # kg
+    "HEIGHT3": "HTM4",  # meters
+    "ALCDAY5": "DROCDY3_",  # drink occasions per day x 100
+    "FRUITJU1": "FTJUDA1_",  # times per day
+    "FRUIT1": "FRUTDA1_",
+    "FVBEANS": "BEANDAY_",
+    "FVGREEN": "GRENDAY_",
+    "FVORANG": "ORNGDAY_",
+    "VEGETAB1": "VEGEDA1_",
+    "EXEROFT1": "PAFREQ1_",  # times per week
+    "EXEROFT2": "PAFREQ2_",
+    "EXERHMM1": "PADUR1_",  # minutes
+    "EXERHMM2": "PADUR2_",
+    "STRENGTH": "STRFREQ_",  # times per week
 }

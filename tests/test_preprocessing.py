@@ -1,4 +1,6 @@
-"""Tests for codes_to_nan (src/preprocessing.py): BRFSS special codes by column."""
+"""Tests for the cleaning steps of src/preprocessing.py: BRFSS special codes by
+column (codes_to_nan), unit conversion, skip logic, missing indicators, imputation
+and binary recoding."""
 
 import os
 import sys
@@ -7,7 +9,18 @@ import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from src.preprocessing import codes_to_nan  # noqa: E402
+from src.feature_types import FEATURE_TYPES  # noqa: E402
+from src.preprocessing import (  # noqa: E402
+    _SKIP_LOGIC,
+    apply_binary_recode,
+    codes_to_nan,
+    convert_units,
+    fill_skip_logic,
+    fit_binary_recode,
+    fit_impute_by_type,
+    missing_rate_difference,
+    one_per_group,
+)
 
 
 def clean_column(name, values):
@@ -62,3 +75,87 @@ def test_input_is_not_modified():
     x = np.array([[9.0, 88.0]])
     codes_to_nan(x, ["GENHLTH", "PHYSHLTH"])
     np.testing.assert_array_equal(x, [[9.0, 88.0]])
+
+
+def test_convert_units():
+    names = ["IYEAR", "IMONTH", "_AGE80"]
+    names += ["BLDSUGAR", "LONGWTCH", "HIVTSTD3", "CHECKUP1"]
+    x = np.array(
+        [
+            # interview Oct 2015; 2 per day; 3 weeks; test Jun 2015; never checked
+            [2015, 10, 60, 102, 203, 62015, 8],
+            # interview Jan 2016; never; all my life; month unknown; 2 = 1-2 years ago
+            [2016, 1, 45, 0, 555, 772015, 2],
+            # 1 per year; 2 years; typing error in the year; don't know
+            [2015, 3, 30, 401, 402, 80201, np.nan],
+        ]
+    )
+    convert_units(x, names)
+    np.testing.assert_allclose(x[:, 3], [730, 0, 1])  # times per year
+    np.testing.assert_allclose(x[:, 4], [3 / 52, 45, 2])  # years
+    np.testing.assert_allclose(x[:, 5], [4, 6.5, np.nan])  # months before
+    np.testing.assert_array_equal(x[:, 6], [5, 2, np.nan])  # never after 4
+
+
+def test_skip_logic_names_exist():
+    # fill_skip_logic skips unknown names silently: a typo would disable a rule
+    for gate, fills in _SKIP_LOGIC:
+        for name in list(gate) + list(fills):
+            assert name in FEATURE_TYPES, name
+
+
+def test_fill_skip_logic():
+    names = ["SMOKE100", "SMOKDAY2", "LASTSMK2", "PHYSHLTH", "MENTHLTH", "POORHLTH"]
+    x = np.array(
+        [
+            # never smoked; no bad day
+            [2, np.nan, np.nan, 0, 0, np.nan],
+            # smokes every day; 5 bad mental health days
+            [1, 1, np.nan, 0, 5, np.nan],
+            # gate unknown: nothing is filled; an answer is never replaced
+            [np.nan, np.nan, np.nan, 0, 0, 3],
+        ]
+    )
+    fill_skip_logic(x, names)
+    np.testing.assert_array_equal(x[:, 1], [3, 1, np.nan])
+    np.testing.assert_array_equal(x[:, 2], [8, 0, np.nan])
+    np.testing.assert_array_equal(x[:, 5], [0, np.nan, 3])
+
+
+def test_missing_rate_difference():
+    y = np.array([1, 1, 1, 1, -1, -1, -1, -1, -1, -1])
+    nan = np.zeros((10, 3), dtype=bool)
+    nan[:5, 0] = True  # 4 of 5 NaN rows are positive, 0 of 5 answered rows
+    nan[0, 2] = True  # a single NaN row
+    diff = missing_rate_difference(nan, y, min_rows=2)
+    np.testing.assert_allclose(diff, [0.8, 0.0, 0.0])
+
+
+def test_one_per_group():
+    nan = np.zeros((10, 4), dtype=bool)
+    nan[:5, 0] = True
+    nan[:5, 1] = True  # same mask as column 0
+    nan[5:, 2] = True  # opposite mask: same group
+    nan[::2, 3] = True  # another group
+    np.testing.assert_array_equal(one_per_group(nan, [1, 0, 2, 3]), [1, 3])
+
+
+def test_impute_and_recode_by_type():
+    # nominal column: the median (3) is a category that nobody chose, the mode is 1
+    x = np.array(
+        [
+            [1, 20.0, 1, 0],
+            [1, 25.0, 2, 1],
+            [5, 30.0, 2, 1],
+            [6, np.nan, np.nan, 1],
+            [np.nan, 40.0, 2, np.nan],
+        ]
+    )
+    types = ["nominal", "continuous", "binary", "binary"]
+    np.testing.assert_allclose(fit_impute_by_type(x, types), [1, 27.5, 2, 1])
+    # SEX-like column 1/2 is recoded, a 0/1 column (e.g. _FRTRESP) is not
+    recode = fit_binary_recode(x, types)
+    np.testing.assert_array_equal(recode, [False, False, True, False])
+    apply_binary_recode(x, recode)
+    np.testing.assert_array_equal(x[:, 2], [1, 0, 0, np.nan, 0])
+    np.testing.assert_array_equal(x[:, 3], [0, 1, 1, 1, np.nan])

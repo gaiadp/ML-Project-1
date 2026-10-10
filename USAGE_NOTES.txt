@@ -35,17 +35,20 @@ src/ e implementations.py. Ogni punto indica dove si trova il codice interessato
 - Lo stesso codice 8 ha significati diversi (regole controllate col codebook, ott. 10):
   "mai/nessuno" -> 0 (ASYMPTOM, ASTHMED3, ...), "non applicabile" -> NaN (SEATBELT,
   SCNTMNY1, ...), oppure una risposta vera fuori ordine (CHECKUP1, EYEEXAM: 8 = mai,
-  va dopo 4; da riordinare nella pipeline). Anche 98 cambia: "non so" nelle visite
+  va dopo 4: convert_units lo cambia in 5). Anche 98 cambia: "non so" nelle visite
   per asma (ASERVIST, ...), "zero" in SCNTWRK1.
 - Nei dati i decimali impliciti del codebook sono GIA' applicati (WTKG3 in kg, HTM4 in
   metri, _BMI5, PAFREQ1_ volte/settimana), tranne DROCDY3_ e _DRNKWEK (ancora x100).
   Quindi anche i codici sono divisi: PAFREQ1_ 99 = codice 99000 "non so".
-- Le colonne a 3 cifre hanno UNITA' MISTE e non sono ancora convertite:
+- Le colonne a 3 cifre hanno UNITA' MISTE:
   ALCDAY5 (1xx = a settimana, 2xx = al mese), FRUIT1, FVBEANS, VEGETAB1, ...
   (1xx/2xx/3xx = al giorno/settimana/mese), EXEROFT1/2, STRENGTH, WEIGHT2 (9xxx = kg),
   HEIGHT3 (piedi/pollici oppure 9xxx = cm).
-  -> non usarle come numeri cosi' come sono: convertirle in una scala unica, oppure
-     usare le versioni gia' calcolate (DROCDY3_, FRUTDA1_, VEGEDA1_, WTKG3, HTM4, _BMI5).
+  -> non usarle come numeri cosi' come sono. Con convert_units=True la pipeline toglie
+     quelle che hanno una versione gia' calcolata (CONVERTED in src/feature_types.py:
+     WEIGHT2 -> WTKG3, ALCDAY5 -> DROCDY3_, ...) e converte le altre (convert_units in
+     src/preprocessing.py): BLDSUGAR/FEETCHK2 in volte all'anno, LONGWTCH in anni,
+     le date FLSHTMY2/HIVTSTD3 in mesi prima dell'intervista.
 - Molte domande si/no sono codificate 1 = si', 2 = no: il segno del peso appare
   "invertito". Non e' un errore, ma va ricordato quando si interpretano i coefficienti.
 - Colonne da NON usare come feature: identificativi e variabili di disegno/peso del
@@ -53,14 +56,42 @@ src/ e implementations.py. Ogni punto indica dove si trova il codice interessato
   la persona e aggiungono solo rumore.
 - Missing informativi: molte domande vengono poste solo a un sottogruppo (skip logic,
   es. BPMEDS solo a chi ha la pressione alta). In quei casi il fatto che il dato
-  manchi e' predittivo -> valutare una colonna indicatrice np.isnan(col).
+  manchi e' predittivo. La pipeline lo gestisce in due modi:
+  * dove il NaN vuol dire "no / zero" (domanda non posta perche' la risposta di filtro
+    lo esclude) lo riempie con quel valore: fill_skip_logic, regole in _SKIP_LOGIC
+    (src/preprocessing.py), verificate sui dati (nessuna riga che soddisfa il filtro
+    ha una risposta alla domanda successiva);
+  * per gli altri NaN informativi aggiunge colonne indicatrici XXX_isnan (B6).
 
 
-3. ORDINE DEL PREPROCESSING  (src/preprocessing.py, src/features.py)
----------------------------------------------------------------------
+3. ORDINE DEL PREPROCESSING  (src/pipeline.py, src/preprocessing.py, src/features.py)
+-------------------------------------------------------------------------------------
 Ordine consigliato:
   codes_to_nan -> scelta/rimozione colonne -> imputazione -> encoding/espansioni
   -> standardizzazione -> add_bias
+
+src/pipeline.py concatena i passi in quest'ordine (passi B di PLAN.md):
+      state = fit_preprocess(x_train, y_train, names, config)
+      tx = apply_preprocess(x, names, state)     # train, validation o test
+      state["out_names"]                         # nomi delle colonne di tx ("bias" prima)
+- config e' un dict di flag, uno per passo (DEFAULT_CONFIG = pipeline completa,
+  V0_CONFIG = la prima pipeline). Per l'ablation: dict(DEFAULT_CONFIG, flag=False).
+  run.py usa ancora V0_CONFIG: stessa submission di prima, finche' la pipeline nuova
+  non e' validata in CV.
+- y_train serve perche' keep_informative / missing_indicators scelgono le colonne in
+  base alla differenza di prevalenza MICHD tra righe NaN e righe con risposta
+  (>= 3 punti, >= 500 righe per lato). Con entrambi a False si puo' passare None.
+  Usare le etichette per scegliere le colonne e' un "fit": in CV va fatto sulla sola
+  parte di training di ogni fold, come le mediane.
+- Indicatori: uno per GRUPPO di colonne che mancano insieme (stesso modulo), non uno
+  per colonna: one_per_group tiene quello con la differenza piu' grande e salta gli
+  altri con maschera correlata > 0.9 (anche in negativo: domande solo-fisso vs
+  solo-cellulare).
+- convert_units e fill_skip_logic modificano x IN PLACE (per non copiare ~800 MB):
+  chiamarle sull'output di codes_to_nan, che e' gia' una copia.
+- Le nominali restano codici numerici (il one-hot e' il passo B9, non ancora fatto);
+  le binarie 1/2 diventano 1/0 (1 = codice 1 del codebook: "si'" per le domande, ma
+  "nessun fattore di rischio" per le _RF*).
 
 - FIT SOLO SUL TRAINING. Tutte le statistiche (mediane, media/std, maschera delle
   colonne, categorie del one-hot) si calcolano sul training e si RIUSANO su validation
