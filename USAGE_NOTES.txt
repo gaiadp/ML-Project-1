@@ -89,9 +89,19 @@ src/pipeline.py concatena i passi in quest'ordine (passi B di PLAN.md):
   solo-cellulare).
 - convert_units e fill_skip_logic modificano x IN PLACE (per non copiare ~800 MB):
   chiamarle sull'output di codes_to_nan, che e' gia' una copia.
-- Le nominali restano codici numerici (il one-hot e' il passo B9, non ancora fatto);
-  le binarie 1/2 diventano 1/0 (1 = codice 1 del codebook: "si'" per le domande, ma
+- Le binarie 1/2 diventano 1/0 (1 = codice 1 del codebook: "si'" per le domande, ma
   "nessun fattore di rischio" per le _RF*).
+- Le liste fisse usate dai passi (REDUNDANT, NOT_MONOTONE, LARGE_NOMINAL, LOG1P,
+  SQUARED in src/feature_types.py) vengono dall'EDA, guardando le etichette di TUTTO
+  il training: il punteggio in CV della pipeline che le usa e' un po' ottimista
+  (dirlo nel report). Le soglie in righe (min_missing_rows, min_category_rows = 500)
+  sono pensate per ~260k righe: nei test con dati finti vanno abbassate.
+- Ordine dentro la pipeline: imputazione (B7) -> 1/2 -> 1/0 (B8) -> clip e log1p
+  (B10) -> one-hot (B9) e quadrati (B11) -> standardizzazione. Il one-hot viene
+  DOPO l'imputazione: le nominali hanno la moda come valore imputato, quindi i NaN
+  finiscono nella categoria di riferimento (vedi sez. 4).
+- Con tutti i passi la matrice ha ~430 colonne (~1 GB per il training intero in
+  float64): il fit richiede ~4 GB di RAM di picco, compresi i dati caricati.
 
 - FIT SOLO SUL TRAINING. Tutte le statistiche (mediane, media/std, maschera delle
   colonne, categorie del one-hot) si calcolano sul training e si RIUSANO su validation
@@ -128,6 +138,16 @@ src/pipeline.py concatena i passi in quest'ordine (passi B di PLAN.md):
   (o GD non regolarizzato) togliere una colonna di riferimento: enc[:, 1:].
 - Non usarlo su colonne con tanti valori distinti (eta', peso, giorni): troppe colonne
   e pochi esempi per categoria. Per quelle: termini lineari/polinomiali o binning.
+- Nella pipeline (B9): fit_categories(x_col, min_rows) sceglie le categorie sul
+  training: i valori con almeno min_rows righe, TRANNE il piu' frequente, che fa da
+  riferimento (riga di zeri, effetto nel bias). Cosi' non c'e' collinearita' esatta
+  con il bias. Nella riga di zeri finiscono anche i valori rari, quelli mai visti e
+  i NaN (imputati con la moda). Il peso di una colonna "EMPLOY1=7" si legge quindi
+  come differenza rispetto alla risposta piu' comune.
+- One-hot anche per le ordinali NON monotone (NOT_MONOTONE, es. _SMOKER3: chi ha
+  smesso ha piu' MICHD di chi fuma e di chi non ha mai fumato, perche' e' piu'
+  anziano). Le nominali con molti valori (_STATE, EXRACT11, EXRACT21) danno ~110
+  colonne: con one_hot_large=False vengono tolte.
 
 
 5. ESPANSIONI DI FEATURE  (src/features.py: build_poly, pairwise_products)
@@ -141,7 +161,15 @@ src/pipeline.py concatena i passi in quest'ordine (passi B di PLAN.md):
   sensate, non tutte.
 - Feature ridondanti (es. 5 versioni dell'eta': _AGE80, _AGEG5YR, _AGE_G, _AGE65YR,
   e MAXVO2_/FC60_ calcolate dall'eta'; _RFCHOL = TOLDHI2 ricodificata;
-  _DRDXAR1 = HAVARTH3) creano collinearita': tenerne una per gruppo.
+  _DRDXAR1 = HAVARTH3) creano collinearita': tenerne una per gruppo. La pipeline
+  toglie i 40 duplicati di REDUNDANT (drop_redundant), ognuno con la colonna che lo
+  determina e che resta.
+- Nella pipeline (B11): centered_powers eleva al quadrato (x - media di train) delle
+  colonne SQUARED, DOPO clip e log1p; poi la standardizzazione (B12) mette in scala
+  anche i quadrati. Centrare evita che x e x^2 siano quasi la stessa colonna.
+- Clip e log (B10): il clip ai percentili 0.5 / 99.5 del training si applica a
+  tutte le colonne count / continue; log1p solo alle LOG1P (minuti ed episodi di
+  esercizio, bevande: distribuzioni con code lunghissime, fino a 54000 min/sett.).
 
 
 6. I 6 METODI  (implementations.py)

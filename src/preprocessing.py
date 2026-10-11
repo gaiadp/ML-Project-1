@@ -556,6 +556,32 @@ def fit_binary_recode(x_train, types):
     return recode
 
 
+def fit_clip_bounds(x_train, numeric, percentiles=(0.5, 99.5)):
+    """B10: lower and upper clipping bound of each column, for apply_clip_log.
+
+    Args:
+        x_train: shape=(N, D), with NaN
+        numeric: bool mask, shape=(D,), the columns to clip
+        percentiles: the bounds, train percentiles of the answered values
+
+    Returns:
+        low, high: shape=(D,), -inf / inf for the other columns
+    """
+    low = np.full(x_train.shape[1], -np.inf)
+    high = np.full(x_train.shape[1], np.inf)
+    cols = np.flatnonzero(numeric & ~np.isnan(x_train).all(axis=0))
+    if len(cols) > 0:
+        low[cols], high[cols] = np.nanpercentile(x_train[:, cols], percentiles, axis=0)
+    return low, high
+
+
+def apply_clip_log(x, low, high, log):
+    """B10, in place: clip every column to [low, high] (outliers, impossible answers),
+    then log1p of the columns where log is True (very skewed counts)."""
+    np.clip(x, low, high, out=x)
+    x[:, log] = np.log1p(x[:, log])
+
+
 def apply_binary_recode(x, recode):
     """B8: 1/2 -> 1/0 in the columns where recode is True, in place.
 

@@ -1301,17 +1301,24 @@ def ranges_and_outliers(x, y01, names, feats):
     of log1p of the clipped values (non-negative columns). A transform is proposed
     for B10 when it raises |r| by R_GAIN and by R_MIN_GAIN: a linear model sees the
     column better.
+
+    Then, on the values as B10 would leave them (clipped, and log1p where proposed),
+    the R^2 of a line and of a parabola through the log-odds (log_odds_fit): a
+    column still curved after B10 (CURVATURE_GAIN, WEAK_SIGNAL) is proposed for a
+    squared term in B11.
     """
     lines = [
         "Ranges and outliers of the count and continuous columns (experiments/eda.py)",
         f"(answered rows; clip at percentiles {CLIP_PERCENTILES}; MICHD % above /"
-        " below the 99th percentile; out = answers outside the plausible range)",
+        " below the 99th percentile; out = answers outside the plausible range;",
+        " R2 line / parab: shape of the log-odds after the B10 transform)",
         "",
         f"{'column':10s} {'type':10s} {'min':>8s} {'p0.5':>8s} {'p50':>8s} "
         f"{'p99.5':>8s} {'max':>8s} {'skew':>6s} {'out':>5s} {'>p99':>5s} "
-        f"{'rest':>5s} {'|r|':>6s} {'clip':>6s} {'log':>6s}  hint",
+        f"{'rest':>5s} {'|r|':>6s} {'clip':>6s} {'log':>6s} {'line':>5s} "
+        f"{'parab':>5s}  hint",
     ]
-    hints = {}
+    hints, curved = {}, []
     for j in feats:
         name, ftype = names[j], FEATURE_TYPES[names[j]]
         # the mixed-units columns left are numbers after convert_units
@@ -1336,15 +1343,25 @@ def ranges_and_outliers(x, y01, names, feats):
         elif r_clip >= R_GAIN * r_raw and r_clip - r_raw >= R_MIN_GAIN:
             hint = "clip"
         hints[name] = hint
+        transformed = np.log1p(clipped) if hint == "clip + log1p" else clipped
+        codes, positions, _ = discretize(transformed, CONTINUOUS)
+        r2_line, r2_parabola, signal, _ = log_odds_fit(codes, positions, yv)
+        if r2_parabola - r2_line >= CURVATURE_GAIN and signal >= WEAK_SIGNAL:
+            curved.append(name)
         lines.append(
             f"{name:10s} {ftype:10s} {fmt_value(q[0]):>8s} {fmt_value(q[1]):>8s} "
             f"{fmt_value(q[2]):>8s} {fmt_value(q[4]):>8s} {fmt_value(q[5]):>8s} "
             f"{skew:6.1f} {n_out:5d} {pct(prev_top):>5s} {pct(yv[~top].mean()):>5s} "
-            f"{r_raw:6.3f} {r_clip:6.3f} {r_log:6.3f}  {hint}"
+            f"{r_raw:6.3f} {r_clip:6.3f} {r_log:6.3f} {r2_line:5.2f} "
+            f"{r2_parabola:5.2f}  {hint}"
         )
-    lines += ["", "== Proposals for B10 =="]
-    for title in ("clip + log1p", "clip"):
-        chosen = [n for n, h in hints.items() if h == title]
+    lines += ["", "== Proposals for B10 / B11 =="]
+    proposals = [
+        ("B10 clip + log1p", [n for n, h in hints.items() if h == "clip + log1p"]),
+        ("B10 clip only", [n for n, h in hints.items() if h == "clip"]),
+        ("B11 squared term: still curved after B10", curved),
+    ]
+    for title, chosen in proposals:
         lines.append(f"{title} ({len(chosen)}):")
         lines.append(textwrap.indent(textwrap.fill(", ".join(chosen), 84), "    "))
     path = save_lines(lines, "outliers.txt")

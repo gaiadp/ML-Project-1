@@ -1,6 +1,6 @@
 """Tests for the cleaning steps of src/preprocessing.py: BRFSS special codes by
-column (codes_to_nan), unit conversion, skip logic, missing indicators, imputation
-and binary recoding."""
+column (codes_to_nan), unit conversion, skip logic, missing indicators, imputation,
+binary recoding, clipping and log."""
 
 import os
 import sys
@@ -13,10 +13,12 @@ from src.feature_types import FEATURE_TYPES  # noqa: E402
 from src.preprocessing import (  # noqa: E402
     _SKIP_LOGIC,
     apply_binary_recode,
+    apply_clip_log,
     codes_to_nan,
     convert_units,
     fill_skip_logic,
     fit_binary_recode,
+    fit_clip_bounds,
     fit_impute_by_type,
     missing_rate_difference,
     one_per_group,
@@ -159,3 +161,17 @@ def test_impute_and_recode_by_type():
     apply_binary_recode(x, recode)
     np.testing.assert_array_equal(x[:, 2], [1, 0, 0, np.nan, 0])
     np.testing.assert_array_equal(x[:, 3], [0, 1, 1, 1, np.nan])
+
+
+def test_clip_and_log():
+    x = np.column_stack([np.arange(101.0), np.arange(101.0)])
+    x[0, 0] = np.nan
+    numeric = np.array([True, False])
+    low, high = fit_clip_bounds(x, numeric, percentiles=(10, 90))
+    # percentiles of 1..100 (the NaN is ignored), interpolated: 1 + 0.1 * 99, ...
+    np.testing.assert_allclose([low[0], high[0]], [10.9, 90.1])
+    np.testing.assert_array_equal([low[1], high[1]], [-np.inf, np.inf])
+
+    test = np.array([[-5.0, -5.0], [500.0, 500.0]])
+    apply_clip_log(test, low, high, np.array([True, False]))
+    np.testing.assert_allclose(test, [[np.log1p(10.9), -5], [np.log1p(90.1), 500]])
