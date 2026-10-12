@@ -6,6 +6,7 @@ one switched on or off by the config for the ablation:
     B1  codes_to_nan        BRFSS special codes -> NaN (don't know) or 0 (none)
     B3  convert_units       one numeric scale per column; raw mixed units dropped
     B4  skip_logic_fill     NaN of the questions that were not asked -> "no" / 0
+    B10 binning             count columns of BINNED -> bin index, one-hot by B9
     B2  domain_drop         drop ids, survey design, label leakage (DOMAIN_DROP)
         drop_redundant      drop the duplicates of other columns (REDUNDANT)
     B5  max_missing_frac    drop columns with too many NaN ...
@@ -13,10 +14,8 @@ one switched on or off by the config for the ablation:
     B6  missing_indicators  one isnan column per group of informative columns
     B7  impute              median, or the mode for binary / nominal columns
     B8  recode_binary       1/2 -> 1/0
-    B9  one_hot             nominal and NOT_MONOTONE ordinal columns -> one-hot
-        one_hot_large       ... also LARGE_NOMINAL (else they are dropped)
-    B10 clip, log_counts    clip numeric columns at train percentiles; log1p of LOG1P
-    B11 poly_degree         powers 2..poly_degree of the SQUARED columns
+    B9  one_hot             nominal (and binned) columns -> one column per frequent value
+        one_hot_ordinal     ... also the ordinal columns of ONE_HOT_ORDINAL
     B12 standardization (mean / std of the training set), B13 bias column
 
 The column lists (src/feature_types.py) come from the EDA. B5 and B6 use the labels:
@@ -32,24 +31,21 @@ Usage:
 import numpy as np
 
 from src.feature_types import (
-    CONTINUOUS,
+    BINNED,
     CONVERTED,
-    COUNT,
     DOMAIN_DROP,
     FEATURE_TYPES,
-    LARGE_NOMINAL,
-    LOG1P,
-    MIXED_UNITS,
     NOMINAL,
-    NOT_MONOTONE,
+    ONE_HOT_ORDINAL,
     REDUNDANT,
-    SQUARED,
 )
-from src.features import add_bias, centered_powers, fit_categories, one_hot_encode
+from src.features import add_bias, fit_one_hot_categories, one_hot_encode
 from src.preprocessing import (
     apply_binary_recode,
     apply_clip_log,
     apply_impute,
+    apply_standardize,
+    bin_columns,
     codes_to_nan,
     convert_units,
     fill_skip_logic,
@@ -65,7 +61,7 @@ from src.preprocessing import (
 # the full pipeline; the ablation variants switch off one step at a time
 DEFAULT_CONFIG = dict(
     domain_drop=True,  # B2: drop the columns of DOMAIN_DROP
-    drop_redundant=True,  # B2: drop the duplicates of REDUNDANT
+    drop_redundant=True,  # B2: drop the columns of REDUNDANT
     convert_units=True,  # B3
     skip_logic_fill=True,  # B4
     max_missing_frac=0.5,  # B5: drop the columns with a larger fraction of NaN ...
@@ -75,17 +71,15 @@ DEFAULT_CONFIG = dict(
     min_missing_rows=500,  # B5/B6: ... between >= 500 NaN and >= 500 answered rows
     impute="by_type",  # B7: "median" or "by_type"
     recode_binary=True,  # B8
-    one_hot=True,  # B9
-    one_hot_large=True,  # B9: one-hot LARGE_NOMINAL too (False: drop them)
-    min_category_rows=500,  # B9: rarer values join the reference value
-    clip=True,  # B10: clip count / continuous columns ...
-    clip_percentiles=(0.5, 99.5),  # B10: ... at these train percentiles
-    log_counts=True,  # B10: log1p of the LOG1P columns
-    poly_degree=2,  # B11: powers 2..poly_degree of the SQUARED columns (1 = none)
+    one_hot=True,  # B9: one-hot encode the nominal columns ...
+    one_hot_min_rows=500,  # ... one column per value with >= 500 training rows
+    one_hot_ordinal=True,  # B9: ... and the ordinal columns of ONE_HOT_ORDINAL
+    binning=True,  # B10: bins of the columns in BINNED (one-hot if one_hot)
 )
 
-# pipeline v0 (first submission): codes_to_nan -> drop columns with > 50% NaN ->
-# median imputation -> standardization -> bias
+# pipeline v0, the baseline: codes_to_nan -> drop columns with > 50% NaN -> median
+# imputation -> one-hot of the nominal columns -> standardization -> bias.
+# The first submission is V0_CONFIG without one-hot: dict(V0_CONFIG, one_hot=False).
 V0_CONFIG = dict(
     DEFAULT_CONFIG,
     domain_drop=False,
@@ -96,10 +90,8 @@ V0_CONFIG = dict(
     missing_indicators=False,
     impute="median",
     recode_binary=False,
-    one_hot=False,
-    clip=False,
-    log_counts=False,
-    poly_degree=1,
+    one_hot_ordinal=False,
+    binning=False,
 )
 
 # types clipped by B10
@@ -107,12 +99,14 @@ _NUMERIC_TYPES = (COUNT, CONTINUOUS, MIXED_UNITS)
 
 
 def _clean(x, names, config):
-    """B1, B3, B4: the steps without fitted statistics. x is not modified."""
+    """B1, B3, B4, B10: the steps without fitted statistics. x is not modified."""
     x = codes_to_nan(x, names)  # a new array: the next steps work in place on it
     if config["convert_units"]:
         convert_units(x, names)
     if config["skip_logic_fill"]:
         fill_skip_logic(x, names)
+    if config["binning"]:
+        bin_columns(x, names, BINNED)
     return x
 
 
@@ -150,20 +144,14 @@ def _expand(x, indicators, state):
 
 
 def _transform(x, state):
-    """B5-B11 on cleaned data (output of _clean)."""
+    """B5-B9 on cleaned data: kept columns (imputed, recoded), then the one-hot
+    columns of the nominal ones, then the missing indicators."""
     indicators = np.isnan(x[:, state["ind_cols"]]).astype(float)
-    return _expand(_numeric_steps(x[:, state["cols"]], state), indicators, state)
-
-
-def _output_names(names, state):
-    """Names of the columns of tx, in the order of _expand, "bias" first."""
-    kept = [str(names[j]) for j in state["cols"]]
-    out = ["bias"] + [kept[k] for k in state["plain"]]
-    for k, cats in state["one_hot"]:
-        out += [f"{kept[k]}={c:g}" for c in cats]
-    for d in range(2, state["config"]["poly_degree"] + 1):
-        out += [f"{kept[k]}^{d}" for k in state["squared"]]
-    return out + [str(names[j]) + "_isnan" for j in state["ind_cols"]]
+    x = apply_impute(x[:, state["cols"]], state["fill"])
+    apply_binary_recode(x, state["recode"])
+    one_hot = [one_hot_encode(x[:, k], cats)[0] for k, cats in state["one_hot"]]
+    encoded = np.array([k for k, _ in state["one_hot"]], dtype=int)
+    return np.hstack([np.delete(x, encoded, axis=1), *one_hot, indicators])
 
 
 def fit_preprocess(x_train, y_train, names, config=None):
@@ -180,12 +168,10 @@ def fit_preprocess(x_train, y_train, names, config=None):
         state: dict for apply_preprocess with the config and
             cols: indices of the kept columns, shape=(K,)
             ind_cols: indices of the columns with a missing indicator, shape=(M,)
-            fill: imputation values, recode: binary columns to recode,
-            low, high, log: clipping bounds and log1p columns (all shape=(K,))
-            plain: kept columns that stay numbers, one_hot: (kept column,
-            categories) pairs, squared: kept columns with powers, center: their
-            train means after B10
-            mean, std: standardization statistics of the columns of tx but bias
+            fill: imputation values, recode: binary columns to recode (shape=(K,))
+            one_hot: (k, categories) for each nominal column cols[k]; it is replaced
+                by one column per category, named "NAME=value"
+            mean, std: standardization statistics, one per column of tx but the bias
             out_names: names of the columns of tx, "bias" first
     """
     config = DEFAULT_CONFIG if config is None else config
@@ -226,6 +212,15 @@ def fit_preprocess(x_train, y_train, names, config=None):
 
     # B7, B8, B10 statistics on the kept columns, before imputation
     x_kept = x[:, cols]
+    # binned and ONE_HOT_ORDINAL columns are sets of classes: imputed with their mode
+    # and one-hot encoded, as the nominal ones
+    as_nominal = set(BINNED) if config["binning"] else set()
+    if config["one_hot_ordinal"]:
+        as_nominal |= set(ONE_HOT_ORDINAL)
+    types = [
+        NOMINAL if names[j] in as_nominal else FEATURE_TYPES.get(names[j])
+        for j in cols
+    ]
     if config["impute"] == "median":
         fill = fit_impute_median(x_kept)
     elif config["impute"] == "by_type":
@@ -237,15 +232,15 @@ def fit_preprocess(x_train, y_train, names, config=None):
     recode = np.zeros(len(cols), dtype=bool)
     if config["recode_binary"]:
         recode = fit_binary_recode(x_kept, types)
-    numeric = np.array([t in _NUMERIC_TYPES for t in types], dtype=bool)
-    low, high = np.full(len(cols), -np.inf), np.full(len(cols), np.inf)
-    if config["clip"]:
-        low, high = fit_clip_bounds(x_kept, numeric, config["clip_percentiles"])
-    # log1p needs values >= 0: the LOG1P columns are counts and durations
-    log = np.zeros(len(cols), dtype=bool)
-    if config["log_counts"]:
-        for k, name in enumerate(kept_names):
-            log[k] = name in LOG1P and not np.any(x_kept[:, k] < 0)
+
+    # B9: categories of each nominal column, on its imputed values
+    one_hot = []
+    if config["one_hot"]:
+        for k, t in enumerate(types):
+            if t == NOMINAL:
+                v = np.where(np.isnan(x_kept[:, k]), fill[k], x_kept[:, k])
+                one_hot.append((k, fit_one_hot_categories(v, config["one_hot_min_rows"])))
+    del x_kept
 
     state = dict(
         config=config,
@@ -253,29 +248,17 @@ def fit_preprocess(x_train, y_train, names, config=None):
         ind_cols=ind_cols,
         fill=fill,
         recode=recode,
-        low=low,
-        high=high,
-        log=log,
+        one_hot=one_hot,
     )
-    x_kept = _numeric_steps(x_kept, state)
-
-    # B9 categories and B11 centers, on the imputed, recoded, clipped training data
-    state["one_hot"] = [
-        (k, fit_categories(x_kept[:, k], config["min_category_rows"]))
-        for k in np.flatnonzero(one_hot)
-    ]
-    state["plain"] = np.flatnonzero(~one_hot)
-    squared = [k for k in state["plain"] if kept_names[k] in SQUARED]
-    if config["poly_degree"] < 2:
-        squared = []
-    state["squared"] = np.array(squared, dtype=int)
-    state["center"] = x_kept[:, state["squared"]].mean(axis=0)
-
     # B12: statistics of the transformed training set
-    indicators = np.isnan(x[:, ind_cols]).astype(float)
-    del x
-    state["mean"], state["std"] = fit_standardize(_expand(x_kept, indicators, state))
-    state["out_names"] = _output_names(names, state)
+    state["mean"], state["std"] = fit_standardize(_transform(x, state))
+    encoded = {k for k, _ in one_hot}
+    state["out_names"] = (
+        ["bias"]
+        + [str(names[j]) for k, j in enumerate(cols) if k not in encoded]
+        + [f"{names[cols[k]]}={c:g}" for k, cats in one_hot for c in cats]
+        + [str(names[j]) + "_isnan" for j in ind_cols]
+    )
     return state
 
 

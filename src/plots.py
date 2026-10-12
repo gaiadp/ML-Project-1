@@ -5,6 +5,7 @@ import matplotlib
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+from matplotlib.ticker import MaxNLocator
 
 # Palette: one accent for data, one for fitted/secondary marks, muted ink for context.
 C_DATA = "#2a78d6"
@@ -126,8 +127,11 @@ def _logit(p):
     return np.log(p / (1 - p))
 
 
-def plot_dependence_grid(names, cols, y01, kinds, path, ncols=4, min_count=30):
+def plot_dependence_grid(
+    names, cols, y01, kinds, path, ncols=4, min_count=30, panel=(3.1, 2.4)
+):
     """One panel per feature: empirical log-odds of the target per value/bin, with 95% CI.
+    panel: (width, height) of one panel in inches.
 
     - categorical/binary: one point per category -> look for non-monotonic patterns
       (=> one-hot encode instead of treating the code as a number).
@@ -140,7 +144,7 @@ def plot_dependence_grid(names, cols, y01, kinds, path, ncols=4, min_count=30):
     n = len(cols)
     nrows = int(np.ceil(n / ncols))
     fig, axes = plt.subplots(
-        nrows, ncols, figsize=(3.1 * ncols, 2.4 * nrows), squeeze=False
+        nrows, ncols, figsize=(panel[0] * ncols, panel[1] * nrows), squeeze=False
     )
     base = _logit(y01.mean())
 
@@ -179,6 +183,8 @@ def plot_dependence_grid(names, cols, y01, kinds, path, ncols=4, min_count=30):
             ax.plot(xs, np.polyval(coef, xs), color=C_FIT, lw=1.5)
         elif kind != "numeric":
             ax.plot(pos[ok], lo, color=C_DATA, lw=0.8, alpha=0.5)
+            # codes are integers: no 1.25, 1.50 ... ticks on a 1/2 column
+            ax.xaxis.set_major_locator(MaxNLocator(integer=True, nbins=6))
 
         if nan.sum() >= min_count:
             pn = y01[nan].mean()

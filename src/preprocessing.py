@@ -438,6 +438,24 @@ def fill_skip_logic(x, names):
                 x[not_asked & np.isnan(x[:, j]), j] = value
 
 
+def bin_columns(x, names, bins):
+    """B10: replace the values of the columns in bins with their bin index, in place.
+
+    Args:
+        x: data after codes_to_nan, shape=(N, D), modified in place
+        names: the D column names
+        bins: column name -> increasing edges; value v gets the index k of the bin
+            edges[k-1] <= v < edges[k] (0 below edges[0], len(edges) from the last
+            edge on). NaN stays NaN. Columns not in names are skipped.
+    """
+    col = {n: j for j, n in enumerate(names)}
+    for name, edges in bins.items():
+        if name in col:
+            v = x[:, col[name]]
+            answered = ~np.isnan(v)
+            v[answered] = np.digitize(v[answered], edges)
+
+
 def drop_columns(x, keep_mask):
     """Keep only the columns where keep_mask is True. keep_mask: bool array, shape (D,)."""
     return x[:, keep_mask]

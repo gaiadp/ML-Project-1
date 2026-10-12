@@ -9,7 +9,11 @@ import pytest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.cross_validation import stratified_split  # noqa: E402
-from src.features import add_bias  # noqa: E402
+from src.features import (  # noqa: E402
+    add_bias,
+    fit_one_hot_categories,
+    one_hot_encode,
+)
 from src.pipeline import (  # noqa: E402
     DEFAULT_CONFIG,
     V0_CONFIG,
@@ -77,10 +81,9 @@ def first_pipeline(x_train, x, names):
     return add_bias(apply_standardize(x, mean, std))
 
 
-def test_v0_config_gives_the_first_pipeline():
+def v0_data(n=300):
     rng = np.random.default_rng(0)
-    n = 300
-    names = ["SEQNO", "GENHLTH", "PHYSHLTH", "_BMI5", "SEX", "INSULIN"]
+    names = ["SEQNO", "GENHLTH", "PHYSHLTH", "_BMI5", "SEX", "INSULIN", "EMPLOY1"]
     bmi = rng.normal(2700, 500, n)
     bmi[rng.random(n) < 0.1] = np.nan
     x = np.column_stack(
@@ -91,11 +94,32 @@ def test_v0_config_gives_the_first_pipeline():
             bmi,
             rng.choice([1, 2], n),
             np.where(rng.random(n) < 0.8, np.nan, rng.choice([1, 2, 9], n)),
+            rng.choice([1, 2, 7, 9], n, p=[0.5, 0.2, 0.2, 0.1]),  # nominal
         ]
     )
-    state = fit_preprocess(x[:200], None, names, V0_CONFIG)
+    return x, names
+
+
+def test_v0_config_without_one_hot_gives_the_first_pipeline():
+    x, names = v0_data()
+    state = fit_preprocess(x[:200], None, names, dict(V0_CONFIG, one_hot=False))
     expected = first_pipeline(x[:200], x[200:], names)
     np.testing.assert_array_equal(apply_preprocess(x[200:], names, state), expected)
+
+
+def test_v0_config_one_hot_encodes_the_nominal_columns():
+    x, names = v0_data()
+    state = fit_preprocess(x[:200], None, names, dict(V0_CONFIG, one_hot_min_rows=5))
+    # EMPLOY1: 1 most frequent (reference), 9 -> NaN -> median 1
+    assert "EMPLOY1" not in state["out_names"]
+    assert state["out_names"][-2:] == ["EMPLOY1=2", "EMPLOY1=7"]
+    first = fit_preprocess(x[:200], None, names, dict(V0_CONFIG, one_hot=False))
+    # the other columns are the ones of the first pipeline
+    assert state["out_names"][:-2] == first["out_names"][:-1]
+    tx = apply_preprocess(x[200:], names, state)
+    np.testing.assert_allclose(
+        tx[:, :-2], apply_preprocess(x[200:], names, first)[:, :-1]
+    )
 
 
 def fake_brfss(n=200):
@@ -162,11 +186,92 @@ def test_full_pipeline():
     assert tx_test.shape == (3, len(out)) and np.isfinite(tx_test).all()
 
 
-def test_large_nominal_columns_can_be_dropped():
+def test_fit_one_hot_categories():
+    # 3 most frequent (reference), 7 rare
+    v = np.array([3.0] * 5 + [1.0] * 3 + [2.0] * 2 + [7.0])
+    np.testing.assert_array_equal(fit_one_hot_categories(v, 2), [1.0, 2.0])
+    np.testing.assert_array_equal(fit_one_hot_categories(v, 3), [1.0])
+    assert len(fit_one_hot_categories(np.full(4, 5.0), 1)) == 0
+    # reference, rare and unseen values all get the all-zero row
+    encoded, _ = one_hot_encode(np.array([1.0, 3.0, 7.0, 42.0]), [1.0, 2.0])
+    np.testing.assert_array_equal(encoded, [[1, 0], [0, 0], [0, 0], [0, 0]])
+
+
+def test_one_hot_step():
     x, y, names = fake_brfss()
-    state = fit_preprocess(x, y, names, dict(FAKE_CONFIG, one_hot_large=False))
-    assert not any(name.startswith("_STATE") for name in state["out_names"])
-    assert sum(name.startswith("MARITAL=") for name in state["out_names"]) == 5
+    # nominal columns only (the ordinal ones: test_one_hot_ordinal_step)
+    config = dict(
+        DEFAULT_CONFIG, min_missing_rows=5, one_hot_min_rows=5, one_hot_ordinal=False
+    )
+    state = fit_preprocess(x, y, names, config)
+    out = state["out_names"]
+    # MARITAL 1..6 (9 -> NaN -> imputed with the mode 2): 2 is the reference
+    assert "MARITAL" not in out
+    marital = [name for name in out if name.startswith("MARITAL=")]
+    assert marital == [f"MARITAL={v}" for v in (1, 3, 4, 5, 6)]
+    # the other columns are unchanged, the one-hot columns come before the indicators
+    assert "GENHLTH" in out and out[-1] == "INSULIN_isnan"
+
+    j = names.index("MARITAL")
+    x_test = np.repeat(x[:1], 4, axis=0)
+    x_test[:, j] = [3.0, 2.0, 9.0, 42.0]  # a category, the reference, NaN, unseen
+    tx = apply_preprocess(x_test, names, state)
+    cols = [out.index(name) for name in marital]
+    hot = tx[:, cols] > 0
+    assert hot[0].tolist() == [False, True, False, False, False]
+    # reference, NaN (imputed with the reference) and unseen value: all-zero row
+    np.testing.assert_array_equal(tx[1], tx[2])
+    np.testing.assert_array_equal(tx[1], tx[3])
+    assert not hot[1].any()
+
+    no_one_hot = fit_preprocess(x, y, names, dict(config, one_hot=False))
+    assert "MARITAL" in no_one_hot["out_names"]
+    assert len(out) == len(no_one_hot["out_names"]) - 1 + len(marital)
+
+
+def test_binning_step():
+    x, y, names = fake_brfss()
+    physhlth = np.tile([88.0, 88.0, 3.0, 10.0, 20.0, 25.0, 30.0, 77.0], 25)
+    x = np.column_stack([x, physhlth])
+    names = names + ["PHYSHLTH"]
+    config = dict(DEFAULT_CONFIG, min_missing_rows=5, one_hot_min_rows=5)
+    out = fit_preprocess(x, y, names, config)["out_names"]
+    # bins 0 (0 days, the reference: most frequent, and NaN imputed with it),
+    # 1 (1-7), 2 (8-14), 3 (15-21), 4 (22-29), 5 (30)
+    assert "PHYSHLTH" not in out
+    assert [n for n in out if n.startswith("PHYSHLTH=")] == [
+        f"PHYSHLTH={k}" for k in range(1, 6)
+    ]
+    out = fit_preprocess(x, y, names, dict(config, binning=False))["out_names"]
+    assert "PHYSHLTH" in out and "PHYSHLTH=1" not in out
+
+
+def test_one_hot_ordinal_step():
+    x, y, names = fake_brfss()
+    config = dict(DEFAULT_CONFIG, min_missing_rows=5, one_hot_min_rows=5)
+    out = fit_preprocess(x, y, names, config)["out_names"]
+    # CHECKUP1 (in ONE_HOT_ORDINAL): 1..4, 8 = never -> 5 (convert_units)
+    assert "CHECKUP1" not in out
+    checkup = [n for n in out if n.startswith("CHECKUP1=")]
+    assert len(checkup) == 4  # 5 values, the most frequent is the reference
+    # GENHLTH is ordinal but not in ONE_HOT_ORDINAL: one numeric column
+    assert "GENHLTH" in out and not any(n.startswith("GENHLTH=") for n in out)
+    out = fit_preprocess(x, y, names, dict(config, one_hot_ordinal=False))["out_names"]
+    assert "CHECKUP1" in out and not any(n.startswith("CHECKUP1=") for n in out)
+
+
+def test_drop_redundant_step():
+    x, y, names = fake_brfss()
+    pa = ["_PACAT1", "_PA150R2", "_PA300R2", "_PA30021", "_PAINDX1"]
+    x = np.column_stack([x, np.tile([[1.0, 1.0, 1.0, 1.0, 1.0]], (len(x), 1))])
+    x[1::2, -5:] = [4.0, 3.0, 3.0, 2.0, 2.0]  # inactive
+    names = names + pa
+    config = dict(DEFAULT_CONFIG, min_missing_rows=5, one_hot_min_rows=5)
+    out = fit_preprocess(x, y, names, config)["out_names"]
+    assert any(n.startswith("_PACAT1") for n in out)
+    assert not any(n.startswith(tuple(pa[1:])) for n in out)
+    out = fit_preprocess(x, y, names, dict(config, drop_redundant=False))["out_names"]
+    assert all(any(n.startswith(name) for n in out) for name in pa)
 
 
 def test_labels_are_needed_only_for_the_missing_steps():

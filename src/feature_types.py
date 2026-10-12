@@ -410,6 +410,119 @@ FEATURE_TYPES = {
     "_AIDTST3": BINARY,
 }
 
+# B10 binning: group the values of a count column into a few classes (bins).
+# src/preprocessing.bin_columns replaces the value v with the bin index k
+# (edges[k-1] <= v < edges[k]), the pipeline one-hot encodes it.
+# PHYSHLTH (days of bad physical health in the past 30): the raw column has every
+# number of days, 0 to 30. We group them because single days are noisy: answers heap
+# on round numbers (0, 7, 14, 15, 30) and days such as 19 or 23 have only a few hundred
+# rows, so their MICHD prevalence jumps around. The bins are weeks, all of the same
+# width, plus the two answers that stand apart, "none" and "every day":
+#   days    0      1-7    8-14   15-21  22-29  30
+#   rows    63.6%  20.2%  3.8%   3.6%   0.9%   7.9%
+#   MICHD   5.9%   8.4%   14.2%  18.6%  22.3%  22.9%
+# Balanced bins are not possible (0 days alone is 63.6% of the rows); narrower bins
+# (5 days) leave a few thousand rows per bin and the noise comes back. Switch off with
+# binning=False to use the raw number of days (to be decided in cross-validation).
+BINNED = {
+    "PHYSHLTH": (1, 8, 15, 22, 30),  # bins 0, 1-7, 8-14, 15-21, 22-29, 30
+}
+
+# B9: ordinal columns one-hot encoded like the nominal ones (one_hot_ordinal=True):
+# the answers have an order, but the MICHD prevalence goes up and down along it, and
+# the distance between two codes is not a quantity, so one weight per code does not fit
+ONE_HOT_ORDINAL = {
+    # 1 every day, 2 some days, 3 former, 4 never: former smokers 13.5% (older, and
+    # some quit after the heart attack), never 6.2%, daily 10.4%
+    "_SMOKER3": "smoking status, former smokers highest",
+    # 0 smoking now (skip logic), 1-7 time since quitting in intervals of very
+    # different widths (< 1 month .. 10+ years), 8 never smoked: not a time scale
+    "LASTSMK2": "time since quitting, uneven intervals + now / never",
+    # 1 highly active, 2 active, 3 insufficiently active, 4 inactive: U-shaped
+    "_PACAT1": "activity category, U-shaped",
+    # 1 within a year .. 4 five+ years, 5 never: last year 10.2%, the others 4-6%
+    # (people with heart disease have regular check-ups)
+    "CHECKUP1": "last check-up, highest in the last year",
+    # the one-hot of these two rebuilds exactly the columns of REDUNDANT that group
+    # their classes. CHOLCHK: 1 < 1 year .. 4 = 5+ years, 5 never (skip logic),
+    # curved log-odds (R^2 0.90 for a line, 0.99 for a parabola)
+    "CHOLCHK": "last cholesterol check, rebuilds BLOODCHO and _CHOLCHK",
+    # _ASTHMS1: 1 current, 2 former, 3 never
+    "_ASTHMS1": "asthma status, rebuilds ASTHMA3, ASTHNOW, _LTASTH1, _CASTHM1",
+}
+
+# B2b: column name -> (kept column it duplicates, reason) (drop_redundant=True).
+# A column is listed only with three pieces of evidence:
+#  - data: experiments/eda.py A7 compares every pair of raw columns (before one-hot
+#    and bins) and checks each entry here: the kept column determines it
+#    (U >= 0.95) or is the same quantity (|r| >= 0.999); build/eda/redundancy.txt,
+#    section "Check of REDUNDANT";
+#  - codebook (2015 BRFSS codebook, section in brackets): the column is computed
+#    from the kept one, or is the same question;
+#  - encoding: a linear model rebuilds the dropped column exactly from the kept one
+#    (kept one-hot or binary, or both a linear function of each other), and the two
+#    have the same missing values (within 2 points).
+# In each family the kept column is the finest one (all the others are groupings
+# of it) and, at equal detail, the more complete one or the raw question.
+# Not listed, although A7 links them to a kept column (they add information that a
+# linear model cannot rebuild; dropping them lowered the validation F1 from 0.4215
+# to 0.4193, while dropping the 30 below left it at 0.4215):
+#  - groupings of a numeric column, i.e. step functions of it: _AGEG5YR, _AGE_G,
+#    _AGE65YR (of _AGE80), _CHLDCNT (CHILDREN), _EDUCAG (EDUCA), _INCOMG (INCOME2),
+#    _RFHLTH (GENHLTH), _RFSEAT2, _RFSEAT3 (SEATBELT), _VEGLT1 (_VEGESUM),
+#    _RFBMI5 (_BMI5CAT) [7.11-7.14, 7.20-7.23, 1.1, 13.1-13.2, 10.14 calc.];
+#  - the same answer for one age range only, blank for the others, so that their
+#    missing values encode the age: _HCVU651 (HLTHPLN1, 18-64), _FLSHOT6
+#    (FLUSHOT6, 65+), _PNEUMO2 (PNEUVAC3, 65+) [3.1, 14.1, 14.2 calc.].
+_PACAT1_GROUPS = "groups of the 4 classes of _PACAT1 (one-hot) [11.22-11.26]"
+REDUNDANT = {
+    # MAXVO2_ = f(age, sex), kept (works as an age x sex term); FC60_ linear in it
+    "FC60_": ("MAXVO2_", "functional capacity, linear in MAXVO2_ [11.4, 11.5]"),
+    # height: HTM4 also has the metric answers, HTIN4 is blank for them
+    "HTIN4": ("HTM4", "same height in inches [7.15, 7.16]"),
+    # race and ethnicity: _RACE (8 classes, one-hot) [7.7] combines _HISPANC and
+    # _MRACE1; the others group its classes
+    "_RACEGR3": ("_RACE", "_RACE 3-6 merged [7.9]"),
+    "_RACE_G1": ("_RACE", "_RACEGR3 with another coding [7.10]"),
+    "_RACEG21": ("_RACE", "non-Hispanic white or not [7.8]"),
+    "_HISPANC": ("_RACE", "Hispanic = _RACE 8 [7.6]"),
+    # blood pressure
+    "_RFHYPE5": ("BPHIGH4", "BPHIGH4 1 / 2-4, BPHIGH4 one-hot [4.1 calc.]"),
+    # cholesterol: CHOLCHK one-hot, 5 = never checked after the skip logic
+    "_CHOLCHK": ("CHOLCHK", "CHOLCHK 1-3 / 4 / never [5.1 calc.]"),
+    "BLOODCHO": ("CHOLCHK", "ever checked = CHOLCHK not 5 (skip logic) [5.1]"),
+    "_RFCHOL": ("TOLDHI2", "TOLDHI2 recoded, BLOODCHO = 1 [5.2 calc.]"),
+    # asthma: _ASTHMS1 current / former / never, one-hot [6.4 calc.]
+    "ASTHMA3": ("_ASTHMS1", "ever asthma = _ASTHMS1 1-2 [6.4]"),
+    "_LTASTH1": ("_ASTHMS1", "ASTHMA3 recoded [6.2 calc.]"),
+    "ASTHNOW": ("_ASTHMS1", "still asthma = _ASTHMS1 1 (skip logic) [6.5]"),
+    "_CASTHM1": ("_ASTHMS1", "current asthma = _ASTHMS1 1 [6.3 calc.]"),
+    # arthritis: the _LMT* (one-hot) combine HAVARTH3 with a follow-up question
+    "_DRDXAR1": ("HAVARTH3", "HAVARTH3 recoded [6.5 calc.]"),
+    "LMTJOIN3": ("_LMTACT1", "limited by arthritis, within _LMTACT1 [12.1 calc.]"),
+    "ARTHDIS2": ("_LMTWRK1", "work limited, within _LMTWRK1 [12.2 calc.]"),
+    "ARTHSOCL": ("_LMTSCL1", "social limits, within _LMTSCL1 [12.3 calc.]"),
+    # smoking: _SMOKER3 (daily / some days / former / never) and LASTSMK2, one-hot
+    "SMOKDAY2": ("_SMOKER3", "every day / some days / not at all [8.1 calc.]"),
+    "SMOKE100": ("_SMOKER3", "never smoked = _SMOKER3 4 [8.1 calc.]"),
+    "_RFSMOK3": ("_SMOKER3", "current smoker = _SMOKER3 1-2 [8.2 calc.]"),
+    # exercise: same answer [11.1 calc.]. EXERANY2, METVL11_, METVL21_ are also
+    # functions of EXRACT11/21, but B9 merges the rare activities: kept
+    "_TOTINDA": ("EXERANY2", "EXERANY2 recoded [11.1 calc.]"),
+    # physical activity, from the minutes per week PA1MIN_ (kept as a number).
+    # _PACAT1: 1 > 300 min, 2 150-300, 3 1-149, 4 none
+    "_PA150R2": ("_PACAT1", _PACAT1_GROUPS),  # 150+ (1, 2), 1-149 (3), none (4)
+    "_PA300R2": ("_PACAT1", _PACAT1_GROUPS),  # 300+ (1), 1-300 (2, 3), none (4)
+    "_PA30021": ("_PACAT1", _PACAT1_GROUPS),  # 300+ (1) or not
+    "_PAINDX1": ("_PACAT1", _PACAT1_GROUPS),  # 150+ (1, 2) or not
+    "_PASTAE1": ("_PAREC1", "both guidelines = _PAREC1 1, one-hot [11.28, 11.29]"),
+    # fruit and vegetables
+    "_FRTRESP": ("_FRUITEX", "missing fruit answers = _FRUITEX 1 [10.9, 10.17]"),
+    "_VEGRESP": ("_VEGETEX", "missing vegetable answers = _VEGETEX 1 [10.10, 10.18]"),
+    # HIV test
+    "_AIDTST3": ("HIVTST6", "HIVTST6 recoded [15.1 calc.]"),
+}
+
 # raw mixed-units column -> the same answer converted to one unit by the CDC.
 # The other mixed-units columns (BLDSUGAR, FEETCHK2, LONGWTCH, FLSHTMY2, HIVTSTD3)
 # have no converted version: src/preprocessing.convert_units converts them.

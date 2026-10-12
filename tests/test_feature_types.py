@@ -6,6 +6,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.feature_types import (  # noqa: E402
+    BINNED,
     CONTINUOUS,
     CONVERTED,
     COUNT,
@@ -15,11 +16,9 @@ from src.feature_types import (  # noqa: E402
     LARGE_NOMINAL,
     LOG1P,
     MIXED_UNITS,
-    NOMINAL,
-    NOT_MONOTONE,
+    ONE_HOT_ORDINAL,
     ORDINAL,
     REDUNDANT,
-    SQUARED,
     TYPES,
 )
 
@@ -59,3 +58,21 @@ def test_converted_columns():
     for raw, converted in CONVERTED.items():
         assert FEATURE_TYPES[raw] == MIXED_UNITS
         assert FEATURE_TYPES[converted] == CONTINUOUS
+
+
+def test_redundant_columns():
+    """Each dropped duplicate names a kept column that the pipeline uses."""
+    for name, (kept, reason) in REDUNDANT.items():
+        assert FEATURE_TYPES[name] != DROP and name not in CONVERTED, name
+        assert isinstance(reason, str) and reason, name
+        assert FEATURE_TYPES[kept] not in (DROP, MIXED_UNITS), kept
+        assert kept not in REDUNDANT and kept not in CONVERTED, kept
+
+
+def test_one_hot_and_binned_columns():
+    for name in ONE_HOT_ORDINAL:
+        assert FEATURE_TYPES[name] == ORDINAL, name
+        assert name not in REDUNDANT, name
+    for name, edges in BINNED.items():
+        assert FEATURE_TYPES[name] not in (DROP, MIXED_UNITS), name
+        assert list(edges) == sorted(set(edges)), name

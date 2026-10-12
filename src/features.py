@@ -33,44 +33,24 @@ def one_hot_encode(x_col, categories=None):
     return encoded, categories
 
 
-def fit_categories(x_col, min_rows=1):
-    """B9: categories of a column for one_hot_encode, fitted on the training set.
+def fit_one_hot_categories(x_col, min_rows):
+    """B9: categories of a nominal column to one-hot encode, fit on train.
 
-    The values with at least min_rows rows, without the most frequent one: it is the
-    reference (all-zero row, its effect goes in the bias), together with the rarer
-    values and the values never seen in training. Without the reference column the
-    one-hot columns do not sum to the bias column (no exact collinearity).
-
-    Args:
-        x_col: shape=(N,), training values (NaN ignored)
-        min_rows: minimum number of rows of a category
-
-    Returns:
-        categories: shape=(K,)
-    """
-    values, counts = np.unique(x_col[~np.isnan(x_col)], return_counts=True)
-    if len(values) == 0:
-        return values
-    reference = values[np.argmax(counts)]
-    frequent = values[counts >= min_rows]
-    return frequent[frequent != reference]
-
-
-def centered_powers(x, center, degree):
-    """B11: powers 2..degree of the columns of x, centered at center (train means).
-
-    Centering keeps x and x^2 from being almost the same column when x is far from 0.
+    The most frequent value is the reference (all-zero row, so the columns are not
+    collinear with the bias), and values with fewer than min_rows rows are merged
+    with it, as the values never seen in the training set.
 
     Args:
-        x: shape=(N, K)
-        center: shape=(K,)
-        degree: highest power; below 2 there are no columns
+        x_col: imputed training column, shape=(N,), no NaN
+        min_rows: a value needs at least this many rows to get its own column
 
     Returns:
-        shape=(N, K * (degree - 1)): all the squares, then all the cubes, ...
+        categories: sorted, shape=(K,), the reference left out
     """
-    z = x - center
-    return np.hstack([np.empty((len(x), 0))] + [z**d for d in range(2, degree + 1)])
+    values, counts = np.unique(x_col, return_counts=True)
+    keep = counts >= min_rows
+    keep[np.argmax(counts)] = False
+    return values[keep]
 
 
 def build_poly(x_col, degree):

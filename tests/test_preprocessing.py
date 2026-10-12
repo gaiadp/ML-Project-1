@@ -1,6 +1,6 @@
 """Tests for the cleaning steps of src/preprocessing.py: BRFSS special codes by
-column (codes_to_nan), unit conversion, skip logic, missing indicators, imputation,
-binary recoding, clipping and log."""
+column (codes_to_nan), unit conversion, skip logic, binning, missing indicators, imputation
+and binary recoding."""
 
 import os
 import sys
@@ -13,7 +13,7 @@ from src.feature_types import FEATURE_TYPES  # noqa: E402
 from src.preprocessing import (  # noqa: E402
     _SKIP_LOGIC,
     apply_binary_recode,
-    apply_clip_log,
+    bin_columns,
     codes_to_nan,
     convert_units,
     fill_skip_logic,
@@ -163,15 +163,11 @@ def test_impute_and_recode_by_type():
     np.testing.assert_array_equal(x[:, 3], [0, 1, 1, 1, np.nan])
 
 
-def test_clip_and_log():
-    x = np.column_stack([np.arange(101.0), np.arange(101.0)])
-    x[0, 0] = np.nan
-    numeric = np.array([True, False])
-    low, high = fit_clip_bounds(x, numeric, percentiles=(10, 90))
-    # percentiles of 1..100 (the NaN is ignored), interpolated: 1 + 0.1 * 99, ...
-    np.testing.assert_allclose([low[0], high[0]], [10.9, 90.1])
-    np.testing.assert_array_equal([low[1], high[1]], [-np.inf, np.inf])
-
-    test = np.array([[-5.0, -5.0], [500.0, 500.0]])
-    apply_clip_log(test, low, high, np.array([True, False]))
-    np.testing.assert_allclose(test, [[np.log1p(10.9), -5], [np.log1p(90.1), 500]])
+def test_bin_columns_physhlth():
+    # raw codes: 88 = none (0 days), 77 = don't know (NaN)
+    days = clean_column("PHYSHLTH", [88, 1, 2, 3, 7, 8, 14, 15, 29, 30, 77])
+    x = np.column_stack([days, days])
+    bin_columns(x, ["PHYSHLTH", "OTHER"], {"PHYSHLTH": (1, 3, 8, 15, 30)})
+    np.testing.assert_array_equal(x[:-1, 0], [0, 1, 1, 2, 2, 3, 3, 4, 4, 5])
+    assert np.isnan(x[-1, 0])
+    np.testing.assert_array_equal(x[:, 1], days)  # not in bins: unchanged
