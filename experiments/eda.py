@@ -1,7 +1,8 @@
 """Exploratory data analysis of the training set, one function per analysis.
 
 Run with the Run button on this file, or:  python experiments/eda.py
-Text tables go to build/eda/ (gitignored).
+Text tables go to build/eda/, exploratory figures to build/eda/figures/ (both
+gitignored), the figures for the report to report/figures/.
 
 Structural overview (structural_overview): shapes and ids, constant and near-constant
 columns, MICHD signal of the columns dropped for domain reasons (DOMAIN_DROP).
@@ -51,6 +52,7 @@ if ROOT not in sys.path:
 from src.data import load_data  # noqa: E402
 from src.feature_types import (  # noqa: E402
     BINARY,
+    BINNED,
     CONTINUOUS,
     CONVERTED,
     COUNT,
@@ -59,7 +61,9 @@ from src.feature_types import (  # noqa: E402
     FEATURE_TYPES,
     MIXED_UNITS,
     NOMINAL,
+    ONE_HOT_ORDINAL,
     ORDINAL,
+    REDUNDANT,
     TYPES,
 )
 from src.plots import (  # noqa: E402
@@ -77,8 +81,11 @@ from src.preprocessing import (  # noqa: E402
 )
 
 STEPS = ("A1", "A2", "A3", "A4", "A5", "A6", "A7", "A8", "A9")
+# text tables (gitignored)
 EDA_DIR = os.path.join(ROOT, "build", "eda")
-# figures for the report; the exploratory ones of A6-A7 stay in EDA_DIR
+# exploratory figures of A6-A7 (gitignored)
+EDA_FIGURES_DIR = os.path.join(EDA_DIR, "figures")
+# figures for the report (A4, A6), in git, referenced by report/report.tex
 FIGURES_DIR = os.path.join(ROOT, "report", "figures")
 
 # near-constant: one value (or NaN) in more than this share of the rows
@@ -156,6 +163,10 @@ CURVATURE_GAIN = 0.1
 WEAK_SIGNAL = 3.0
 # A6: number of features in the figures
 TOP_FEATURES = 24
+# A6: report figure, the REPORT_FEATURES columns with the highest MI, skipping a
+# column with |Pearson r| > REPORT_MAX_CORR with one already chosen (age variants)
+REPORT_FEATURES = 16
+REPORT_MAX_CORR = 0.7
 # A6, A7: a nominal column with more values (with enough rows) than this may not
 # be one-hot encoded as it is (B9): group or drop its rare values
 MAX_ONE_HOT = 10
@@ -164,11 +175,17 @@ REDUNDANCY_ROWS = 100_000
 # A7: quantile bins of the continuous columns, fine enough to see a recoding
 REDUNDANCY_BINS = 100
 # A7: a determines b when U(b|a) = MI(a, b) / H(b) >= DETERMINED; a and b are the
-# same quantity when |Pearson r| >= SAME_QUANTITY; pairs above REVIEW (either
-# measure) are listed for a look
+# same quantity (a linear function of each other, e.g. a unit change) when
+# |Pearson r| >= SAME_QUANTITY; pairs above REVIEW (either measure) are listed
 DETERMINED = 0.95
-SAME_QUANTITY = 0.98
+SAME_QUANTITY = 0.999
 REVIEW = 0.9
+# A7: greedy order, blocks of missing fraction (finer columns first inside a
+# block); a column is a duplicate only if its missing fraction differs from the
+# kept one by at most NAN_TOLERANCE (else its NaN pattern carries information,
+# e.g. _HCVU651 = HLTHPLN1 for age 18-64 only)
+NAN_BLOCK = 0.05
+NAN_TOLERANCE = 0.02
 # A9: clipping percentiles to try (proposal for B10)
 CLIP_PERCENTILES = (0.5, 99.5)
 # A9: clipping or log1p helps when |r| grows by at least this factor and by at
@@ -214,6 +231,13 @@ def save_lines(lines, filename):
     with open(path, "w") as f:
         f.write("\n".join(lines) + "\n")
     return path
+
+
+def figure_path(directory, filename):
+    """Path of a figure in directory (EDA_FIGURES_DIR or FIGURES_DIR), created if
+    needed."""
+    os.makedirs(directory, exist_ok=True)
+    return os.path.join(directory, filename)
 
 
 def column_profile(col, y01):
@@ -735,8 +759,7 @@ def missingness_analysis(x_raw, x_clean, y01, names):
         lines.append(f"    {label:>12s}: {pct(prev):>5s}%  n={n}")
 
     path = save_lines(lines, "missingness.txt")
-    os.makedirs(FIGURES_DIR, exist_ok=True)
-    figure = os.path.join(FIGURES_DIR, "missing_balance.png")
+    figure = figure_path(FIGURES_DIR, "missing_balance.png")
     plot_missing_and_balance(frac, y01, figure)
     print(f"leakage scan: {len(leaks)} values; {len(groups)} groups missing together")
     print(f"tables: {path}, figure: {figure}")
@@ -981,8 +1004,10 @@ def encoding_hint(s):
 def target_relation(x, y01, names, feats, stats):
     """A6: table of the univariate relation of each feature with MICHD, sorted by
     mutual information, with the proposed encoding (encoding_hint). Saves
-    build/eda/target_relation.txt and three figures in build/eda/: MI ranking, MI vs
+    build/eda/target_relation.txt and three figures in build/eda/figures/: MI ranking, MI vs
     |r|, log-odds per value / decile of the TOP_FEATURES columns with the highest MI.
+    The report figure report/figures/log_odds.png is the same log-odds grid for
+    REPORT_FEATURES columns, without near-duplicates (distinct_top).
 
     The proposals use the labels of the whole training set: fixed lists chosen from
     them make the cross-validation score slightly optimistic (say so in the report).
@@ -1032,23 +1057,68 @@ def target_relation(x, y01, names, feats, stats):
     plot_ranking(
         ranked,
         1000 * mi,
-        os.path.join(EDA_DIR, "mi_ranking.png"),
+        figure_path(EDA_FIGURES_DIR, "mi_ranking.png"),
         "mutual information with MICHD [millibits]",
         "Features ranked by mutual information",
         top=TOP_FEATURES,
     )
-    plot_mi_vs_corr(ranked, mi, abs_r, os.path.join(EDA_DIR, "mi_vs_corr.png"))
+    plot_mi_vs_corr(ranked, mi, abs_r, figure_path(EDA_FIGURES_DIR, "mi_vs_corr.png"))
     top = ranked[:TOP_FEATURES]
     plot_dependence_grid(
         top,
         [x[:, col[n]] for n in top],
         y01,
-        [stats[n]["kind"] for n in top],
-        os.path.join(EDA_DIR, "log_odds_top.png"),
+        [plot_kind(stats[n]) for n in top],
+        figure_path(EDA_FIGURES_DIR, f"log_odds_top{TOP_FEATURES}.png"),
         ncols=6,
     )
+    report = distinct_top(x, names, ranked)
+    figure = figure_path(FIGURES_DIR, "log_odds.png")
+    plot_dependence_grid(
+        report,
+        [x[:, col[n]] for n in report],
+        y01,
+        [plot_kind(stats[n]) for n in report],
+        figure,
+        ncols=4,
+        panel=(2.3, 1.75),
+    )
     print(f"top 5 by MI: {', '.join(ranked[:5])}")
-    print(f"table: {path}, figures in {EDA_DIR}")
+    print(f"table: {path}, figures in {EDA_FIGURES_DIR}, report figure: {figure}")
+
+
+def plot_kind(s):
+    """How plot_dependence_grid draws a column: a count or continuous column with
+    many values in quantile bins with a linear fit ("numeric"), not one point per
+    value (the rare values, e.g. 19 or 23 days of PHYSHLTH, are only noise)."""
+    if s["type"] in (COUNT, CONTINUOUS) and s["n_values"] > MAX_ONE_HOT:
+        return "numeric"
+    return s["kind"]
+
+
+def distinct_top(x, names, ranked):
+    """The first REPORT_FEATURES columns of ranked, skipping the columns of
+    REDUNDANT and a column with |Pearson r| > REPORT_MAX_CORR (rows where both are answered) with one chosen
+    before: one column per quantity (age, blood pressure, ...) in the report figure.
+    """
+    col = {name: j for j, name in enumerate(names)}
+    chosen = []
+    for name in ranked:
+        if name in REDUNDANT:  # dropped by the pipeline as a duplicate
+            continue
+        a = x[:, col[name]]
+        distinct = True
+        for other in chosen:
+            b = x[:, col[other]]
+            both = ~np.isnan(a) & ~np.isnan(b)
+            if abs(np.nan_to_num(pearson(a[both], b[both]))) > REPORT_MAX_CORR:
+                distinct = False
+                break
+        if distinct:
+            chosen.append(name)
+            if len(chosen) == REPORT_FEATURES:
+                break
+    return chosen
 
 
 def pairwise_correlation(x):
@@ -1096,19 +1166,28 @@ def determination(a, b, n_a, n_b):
 
 def redundancy(x, names, feats, stats):
     """A7: columns that duplicate other columns. Saves build/eda/redundancy.txt and
-    build/eda/corr_top.png (correlations of the TOP_FEATURES columns by MI).
+    build/eda/figures/corr_top.png (correlations of the TOP_FEATURES columns by MI).
 
-    On REDUNDANCY_ROWS random rows: |Pearson r| of each pair and U(b|a), how much a
-    determines b (continuous columns cut in REDUNDANCY_BINS quantile bins).
-    Proposal of duplicates to drop (B2), greedy: go through the columns from the
-    least missing (ties: more distinct values, then higher MI) and drop a column if
-    a column kept before is the same quantity (|r| >= SAME_QUANTITY), or determines
-    it (U >= DETERMINED, b coded by value) and is encoded so that any function of
-    it is linear for the model (linear_encoding). A dropped column is then a
-    function of a kept one, and the kept one is not more often missing.
-    A column determined only by a curved numeric column (it works as a bin of it)
-    or by a nominal column with many values is kept, and listed as conditional:
-    drop it only if B9-B11 encode its determinant non-linearly.
+    On the raw columns, before any encoding (one-hot, bins): every pair of the
+    feature columns, the columns of REDUNDANT included, plus the raw columns of
+    CONVERTED (to check that their converted version is the same answer). On
+    REDUNDANCY_ROWS random rows: |Pearson r| of each pair and U(b|a), how much a
+    determines b (continuous columns cut in REDUNDANCY_BINS quantile bins, the raw
+    mixed-units codes by value).
+
+    Proposal of duplicates to drop (B2), greedy over the feature columns: go through
+    them in blocks of NAN_BLOCK missing fraction, the finer ones first (more
+    distinct values), and drop a column if a column kept before, with a missing
+    fraction within NAN_TOLERANCE, is the same quantity (|r| >= SAME_QUANTITY) or
+    determines it (U >= DETERMINED, b coded by value) and the pipeline encodes it
+    so that a linear model rebuilds any function of it exactly (rebuilds: one-hot
+    or binary). A column determined only by a numeric column (it is a grouping of
+    it, e.g. age classes of the age) or by a nominal column whose rare values B9
+    merges is kept and listed as conditional: it adds a non-linear term.
+
+    Then: families of linked columns (connected components of the pairs that pass
+    one of the two thresholds), the check of every entry of REDUNDANT and of
+    CONVERTED (the evidence for the hand-made lists), and all pairs above REVIEW.
     """
     cols = [names[j] for j in feats]
     rng = np.random.default_rng(0)
@@ -1116,8 +1195,11 @@ def redundancy(x, names, feats, stats):
     sub = x[np.ix_(rows, feats)]
     corr, overlap = pairwise_correlation(sub)
 
+    # raw mixed-units codes (1xx per day, 2xx per week ...) by value, not in bins
     coded = [
-        discretize(sub[:, k], FEATURE_TYPES[n], REDUNDANCY_BINS)
+        discretize(
+            sub[:, k], NOMINAL if n in CONVERTED else FEATURE_TYPES[n], REDUNDANCY_BINS
+        )
         for k, n in enumerate(cols)
     ]
     codes = [c for c, _, _ in coded]
@@ -1129,77 +1211,172 @@ def redundancy(x, names, feats, stats):
         for b in range(a + 1, d):
             if overlap[a, b] >= MIN_GROUP_SIZE:
                 u[a, b], u[b, a] = determination(codes[a], codes[b], sizes[a], sizes[b])
+    enough = overlap >= MIN_GROUP_SIZE
+    same = enough & (np.abs(np.nan_to_num(corr)) >= SAME_QUANTITY)
+    determined = enough & (np.nan_to_num(u) >= DETERMINED)  # [a, b]: a determines b
+    np.fill_diagonal(same, False)
+    np.fill_diagonal(determined, False)
 
     pairs = []
     for a in range(d):
         for b in range(a + 1, d):
             score = max(abs(corr[a, b]), u[a, b], u[b, a])
-            if overlap[a, b] >= MIN_GROUP_SIZE and score >= REVIEW:
+            if enough[a, b] and score >= REVIEW:
                 pairs.append((score, a, b))
     pairs.sort(reverse=True)
 
     nan_frac = np.isnan(sub).mean(axis=0)
-    order = sorted(
-        range(d),
-        key=lambda k: (round(nan_frac[k], 2), -sizes[k], -stats[cols[k]]["mi"]),
-    )
     hints = {name: encoding_hint(stats[name]) for name in cols}
+    one_hot = set(ONE_HOT_ORDINAL) | set(BINNED)
 
-    def linear_encoding(m):
-        """True if every function of column m is linear in the encoding proposed for
-        m by A6: binary, linear numeric, or one-hot (a nominal column with
-        <= MAX_ONE_HOT values, or an ordinal one that is not monotone)."""
-        hint = hints[cols[m]]
-        linear = ("as is", "numeric", "linear", "one-hot: not monotone")
-        return hint in linear or hint.startswith("one-hot (")
+    def rebuilds(m):
+        """True if a linear model rebuilds exactly any function of column m from
+        its encoding in the pipeline: one-hot (nominal, ONE_HOT_ORDINAL, BINNED) or
+        binary. Not a nominal column with many values: B9 merges its rare values.
+        Not a numeric column: a grouping of it is a step, not linear in it."""
+        name = cols[m]
+        if hints[name].startswith("one-hot, many"):
+            return False
+        return name in one_hot or FEATURE_TYPES[name] in (BINARY, NOMINAL)
 
-    kept, dropped, conditional = [], [], []
+    features = [k for k in range(d) if cols[k] not in CONVERTED]
+    order = sorted(
+        features,
+        key=lambda k: (
+            int(nan_frac[k] / NAN_BLOCK),
+            -sizes[k],
+            nan_frac[k],
+            -stats[cols[k]]["mi"],
+        ),
+    )
+    kept, status = [], {}
+    dropped, conditional = [], []
     for k in order:
         reason, note = None, None
         for m in kept:
-            if overlap[m, k] < MIN_GROUP_SIZE:
+            if abs(nan_frac[m] - nan_frac[k]) > NAN_TOLERANCE:
                 continue
-            if abs(corr[m, k]) >= SAME_QUANTITY:
+            if same[m, k]:
                 reason = f"same quantity as {cols[m]} (r = {corr[m, k]:+.3f})"
                 break
-            if by_value[k] and u[m, k] >= DETERMINED:
+            if by_value[k] and determined[m, k]:
                 text = f"determined by {cols[m]} (U = {u[m, k]:.3f})"
-                if linear_encoding(m):
+                if rebuilds(m):
                     reason = text
                     break
                 note = note or f"{text}, which is {hints[cols[m]]}"
         if reason:
             dropped.append((cols[k], reason))
+            status[k] = "drop"
         else:
             kept.append(k)
+            status[k] = "conditional" if note else "keep"
             if note:
                 conditional.append((cols[k], note))
+    for k in range(d):
+        status.setdefault(k, "raw, B3")
+
+    def row(name, text):
+        s = stats[name]
+        mark = "R" if name in REDUNDANT else " "
+        return f"{mark} {name:10s} {pct(s['nan_frac']):>5s} {1000 * s['mi']:6.2f}  {text}"
 
     lines = [
         "Redundancy (experiments/eda.py)",
-        f"({len(rows)} random rows, {d} feature columns; U(b|a) = MI(a, b) / H(b) on"
-        " the rows where both are answered, 1 = b is a function of a)",
+        f"({len(rows)} random rows, {len(features)} feature columns + "
+        f"{d - len(features)} raw CONVERTED columns, compared before any encoding;",
+        " U(b|a) = MI(a, b) / H(b) on the rows where both are answered, 1 = b is a"
+        " function of a; R = listed in REDUNDANT)",
         "",
         f"== Proposed duplicates to drop ({len(dropped)}): determined by a kept column"
         f" (U >= {DETERMINED}) or same quantity (|r| >= {SAME_QUANTITY}) ==",
-        f"{'column':10s} {'NaN%':>5s} {'MI':>6s}  reason",
+        f"  {'column':10s} {'NaN%':>5s} {'MI':>6s}  reason",
     ]
-    for name, reason in dropped:
-        s = stats[name]
-        lines.append(
-            f"{name:10s} {pct(s['nan_frac']):>5s} {1000 * s['mi']:6.2f}  {reason}"
-        )
+    lines += [row(name, reason) for name, reason in dropped]
     lines += [
         "",
-        f"== Conditional duplicates, kept ({len(conditional)}): determined by a curved"
-        " numeric column (a bin of it) or by a nominal column with many values ==",
-        f"{'column':10s} {'NaN%':>5s} {'MI':>6s}  reason",
+        f"== Conditional duplicates, kept ({len(conditional)}): determined by a column"
+        " that the model cannot use to rebuild them (numeric: they are a grouping of"
+        " it; nominal with merged rare values) ==",
+        f"  {'column':10s} {'NaN%':>5s} {'MI':>6s}  reason",
     ]
-    for name, note in conditional:
-        s = stats[name]
+    lines += [row(name, note) for name, note in conditional]
+
+    families = [
+        g for g in connected_groups(same | determined | determined.T) if len(g) > 1
+    ]
+    lines += [
+        "",
+        f"== Families of linked columns ({len(families)}): each column is the same"
+        " quantity as, determines or is determined by another one of the family;"
+        " status = greedy proposal, R = dropped by REDUNDANT ==",
+    ]
+    for g in families:
         lines.append(
-            f"{name:10s} {pct(s['nan_frac']):>5s} {1000 * s['mi']:6.2f}  {note}"
+            "  "
+            + ", ".join(
+                f"{cols[k]} ({sizes[k]} val, {pct(nan_frac[k])}% NaN, {status[k]}"
+                + (", R)" if cols[k] in REDUNDANT else ")")
+                for k in sorted(g, key=lambda k: -sizes[k])
+            )
         )
+
+    index = {name: k for k, name in enumerate(cols)}
+
+    def check(b_name, a_name, converted=False):
+        """Evidence that column b duplicates column a, with the rules of the greedy
+        proposal: same quantity, or a determines b and rebuilds it (one-hot or
+        binary), and missing fractions within NAN_TOLERANCE. converted: b is a raw
+        mixed-units column and a its converted version, both coded by value; a
+        must be a function of b."""
+        if b_name not in index or a_name not in index:
+            return "column not analysed"
+        b, a = index[b_name], index[a_name]
+        if not enough[a, b]:
+            return f"NO EVIDENCE: {int(overlap[a, b])} rows in common"
+        u_ba, u_ab = u[a, b], u[b, a]
+        if converted:
+            code_a, _, n_a = discretize(sub[:, a], NOMINAL)
+            code_b, _, n_b = discretize(sub[:, b], NOMINAL)
+            u_ba, u_ab = determination(code_a, code_b, n_a, n_b)
+            ok = u_ab >= DETERMINED
+            problems = ["converted is not a function of the raw codes"]
+        else:
+            problems = []
+            if not (same[a, b] or determined[a, b]):
+                problems.append("not determined")
+            elif not (same[a, b] or rebuilds(a)):
+                problems.append(f"{a_name} does not rebuild it")
+            if abs(nan_frac[a] - nan_frac[b]) > NAN_TOLERANCE:
+                problems.append(
+                    f"NaN {pct(nan_frac[b])}% vs {pct(nan_frac[a])}%"
+                )
+            ok = not problems
+        verdict = "ok" if ok else "NO (" + ", ".join(problems) + ")"
+        return (
+            f"{verdict}: |r| = {abs(corr[a, b]):.3f}, "
+            f"U(b|a) = {u_ba:.3f}, U(a|b) = {u_ab:.3f}, {int(overlap[a, b])} rows"
+        )
+
+    lines += [
+        "",
+        f"== Check of REDUNDANT (src/feature_types.py, {len(REDUNDANT)} columns):"
+        " b dropped as a duplicate of a ==",
+    ]
+    lines += [
+        f"  {b:10s} <- {a:10s} {check(b, a)}" for b, (a, _) in REDUNDANT.items()
+    ]
+    lines += [
+        "",
+        f"== Check of CONVERTED ({len(CONVERTED)} raw columns b, converted version a,"
+        f" by value): a must be a function of b, U(a|b) >= {DETERMINED}; U(b|a) < 1"
+        " when one quantity has several codes (101 = 207 = 330: once a day) ==",
+    ]
+    lines += [
+        f"  {b:10s} -> {a:10s} {check(b, a, converted=True)}"
+        for b, a in CONVERTED.items()
+    ]
+
     lines += [
         "",
         f"== Pairs with |r|, U(b|a) or U(a|b) >= {REVIEW} ({len(pairs)}) ==",
@@ -1212,12 +1389,14 @@ def redundancy(x, names, feats, stats):
         )
     path = save_lines(lines, "redundancy.txt")
 
-    top = sorted(cols, key=lambda n: -stats[n]["mi"])[:TOP_FEATURES]
-    index = {name: j for j, name in enumerate(names)}
+    top = sorted(
+        (n for n in cols if n not in CONVERTED), key=lambda n: -stats[n]["mi"]
+    )[:TOP_FEATURES]
+    column = {name: j for j, name in enumerate(names)}
     plot_corr_heatmap(
         top,
-        x[:, [index[n] for n in top]],
-        os.path.join(EDA_DIR, "corr_top.png"),
+        x[:, [column[n] for n in top]],
+        figure_path(EDA_FIGURES_DIR, "corr_top.png"),
     )
     print(
         f"{len(pairs)} pairs to review, {len(dropped)} proposed duplicates, "
@@ -1379,7 +1558,10 @@ def main(steps):
     if "A6" in steps:
         target_relation(x_clean, y01, names, feats, stats)
     if "A7" in steps:
-        redundancy(x_clean, names, feats, stats)
+        # also the raw columns of CONVERTED, against their converted version
+        raw = [j for j, name in enumerate(names) if name in CONVERTED]
+        stats_raw = feature_stats(x_clean, y01, names, raw)
+        redundancy(x_clean, names, feats + raw, {**stats, **stats_raw})
     if "A8" in steps:
         x_test = codes_to_nan(x_test, names)
         convert_units(x_test, names)

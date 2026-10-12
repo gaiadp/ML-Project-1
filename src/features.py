@@ -33,6 +33,26 @@ def one_hot_encode(x_col, categories=None):
     return encoded, categories
 
 
+def fit_one_hot_categories(x_col, min_rows):
+    """B9: categories of a nominal column to one-hot encode, fit on train.
+
+    The most frequent value is the reference (all-zero row, so the columns are not
+    collinear with the bias), and values with fewer than min_rows rows are merged
+    with it, as the values never seen in the training set.
+
+    Args:
+        x_col: imputed training column, shape=(N,), no NaN
+        min_rows: a value needs at least this many rows to get its own column
+
+    Returns:
+        categories: sorted, shape=(K,), the reference left out
+    """
+    values, counts = np.unique(x_col, return_counts=True)
+    keep = counts >= min_rows
+    keep[np.argmax(counts)] = False
+    return values[keep]
+
+
 def build_poly(x_col, degree):
     """Polynomial expansion of a single numeric column: [x, x^2, ..., x^degree]."""
     return np.hstack([(x_col**d)[:, None] for d in range(1, degree + 1)])

@@ -24,7 +24,8 @@ from src.pipeline import V0_CONFIG, apply_preprocess, fit_preprocess
 
 SEED = 1
 VAL_RATIO = 0.2
-# preprocessing steps (src/pipeline.py): v0 until the full pipeline is validated in CV
+# preprocessing steps (src/pipeline.py): v0 (with one-hot) until the full pipeline is
+# validated in CV. The first submission was dict(V0_CONFIG, one_hot=False).
 PIPELINE = V0_CONFIG
 METHOD = "ridge_regression"
 LAMBDA = 1e-4

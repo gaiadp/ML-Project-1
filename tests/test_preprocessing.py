@@ -1,5 +1,5 @@
 """Tests for the cleaning steps of src/preprocessing.py: BRFSS special codes by
-column (codes_to_nan), unit conversion, skip logic, missing indicators, imputation
+column (codes_to_nan), unit conversion, skip logic, binning, missing indicators, imputation
 and binary recoding."""
 
 import os
@@ -13,6 +13,7 @@ from src.feature_types import FEATURE_TYPES  # noqa: E402
 from src.preprocessing import (  # noqa: E402
     _SKIP_LOGIC,
     apply_binary_recode,
+    bin_columns,
     codes_to_nan,
     convert_units,
     fill_skip_logic,
@@ -159,3 +160,13 @@ def test_impute_and_recode_by_type():
     apply_binary_recode(x, recode)
     np.testing.assert_array_equal(x[:, 2], [1, 0, 0, np.nan, 0])
     np.testing.assert_array_equal(x[:, 3], [0, 1, 1, 1, np.nan])
+
+
+def test_bin_columns_physhlth():
+    # raw codes: 88 = none (0 days), 77 = don't know (NaN)
+    days = clean_column("PHYSHLTH", [88, 1, 2, 3, 7, 8, 14, 15, 29, 30, 77])
+    x = np.column_stack([days, days])
+    bin_columns(x, ["PHYSHLTH", "OTHER"], {"PHYSHLTH": (1, 3, 8, 15, 30)})
+    np.testing.assert_array_equal(x[:-1, 0], [0, 1, 1, 2, 2, 3, 3, 4, 4, 5])
+    assert np.isnan(x[-1, 0])
+    np.testing.assert_array_equal(x[:, 1], days)  # not in bins: unchanged

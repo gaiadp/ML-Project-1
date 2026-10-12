@@ -1,16 +1,16 @@
-"""Train/validation splits, k-fold cross-validation and hyperparameter grid search."""
+"""Train/validation splits, k-fold cross-validation and hyperparameter grid search.
+
+The cross-validation functions take the RAW data and fit the preprocessing
+(src/pipeline.py) inside each fold, on its training part only: the statistics
+(informative NaN columns chosen with the labels, medians, one-hot categories,
+mean / std) never see the validation part, as on the real test set.
+"""
 
 import numpy as np
 
-
-def build_k_indices(n, k_fold, seed=1):
-    """Randomly partition range(n) into k_fold folds of (almost) equal size.
-
-    Returns a list of k_fold 1D index arrays; the first n % k_fold folds get one extra sample,
-    so every sample is used exactly once for validation.
-    """
-    rng = np.random.default_rng(seed)
-    return np.array_split(rng.permutation(n), k_fold)
+from src.metrics import best_threshold, f1_score, predict_labels
+from src.models import fit, predict_scores
+from src.pipeline import apply_preprocess, fit_preprocess
 
 
 def ridge_weights_svd(y, tx, lambdas):
@@ -34,37 +34,126 @@ def ridge_weights_svd(y, tx, lambdas):
     return (factors * uty) @ vt  # (L, D)
 
 
-def cross_validation_ridge(y, tx, lambdas, k_fold=5, seed=1):
-    """Pick the ridge lambda with the lowest mean validation MSE over k folds.
+def stratified_k_indices(y, k_fold, seed=1):
+    """Partition range(len(y)) into k_fold folds with the class proportions of y.
 
-    For each fold the SVD of the training block is computed once and reused for every
-    lambda in the grid (see ridge_weights_svd).
-    tx must already be preprocessed; if the preprocessing fits statistics on the data
-    (standardization, imputation, ...), the fold-wise fit is the caller's responsibility.
+    The positives (label 1) and the negatives are permuted and split separately, so
+    every fold gets ~1/k_fold of each class (8.8% positives in every fold).
 
-    Returns (best_lambda, mean_val_losses, mean_train_losses), where the loss arrays have
-    shape (len(lambdas),) and use the same 1/2 * MSE convention as implementations.py.
+    Returns:
+        list of k_fold sorted 1D index arrays, disjoint, together range(len(y))
     """
+    rng = np.random.default_rng(seed)
+    is_pos = np.asarray(y) == 1
+    folds = [[] for _ in range(k_fold)]
+    for idx in (np.flatnonzero(is_pos), np.flatnonzero(~is_pos)):
+        for k, part in enumerate(np.array_split(rng.permutation(idx), k_fold)):
+            folds[k].append(part)
+    return [np.sort(np.concatenate(parts)) for parts in folds]
+
+
+def _fold(k_indices, k):
+    """Training and validation indices of fold k."""
+    train_idx = np.concatenate([idx for j, idx in enumerate(k_indices) if j != k])
+    return np.sort(train_idx), k_indices[k]
+
+
+def _preprocess_fold(x, y, names, config, train_idx, val_idx):
+    """Fit the preprocessing on the training rows only and apply it to both parts."""
+    state = fit_preprocess(x[train_idx], y[train_idx], names, config)
+    tx_tr = apply_preprocess(x[train_idx], names, state)
+    tx_va = apply_preprocess(x[val_idx], names, state)
+    return tx_tr, tx_va, state
+
+
+def cross_validate(x, y, names, config, method, k_fold=5, seed=1, **fit_kwargs):
+    """k-fold cross-validation of preprocessing + model, scored with F1.
+
+    For each stratified fold: fit_preprocess on the training part, fit the model,
+    choose the decision threshold that maximizes F1 on the TRAINING scores, and
+    measure F1 on the validation part with that threshold. f1_val_best (threshold
+    chosen on the validation part itself) is optimistic, as the single-split
+    number of run.py: report f1, compare with f1_val_best.
+
+    Args:
+        x: raw data, shape=(N, D) (Id column removed)
+        y: labels in {-1, 1}, shape=(N,)
+        names: the D column names
+        config: preprocessing config (src/pipeline.py)
+        method: one of src.models.METHODS
+        k_fold, seed: folds and their seed
+        **fit_kwargs: lambda_, gamma, max_iters, ... for src.models.fit
+
+    Returns:
+        dict with, per fold (shape=(k_fold,)): f1, f1_val_best, threshold, n_features;
+        and oof_scores, shape=(N,): validation score of each row (out of fold)
+    """
+    y = np.asarray(y)
+    k_indices = stratified_k_indices(y, k_fold, seed)
+    out = {key: np.zeros(k_fold) for key in ("f1", "f1_val_best", "threshold")}
+    out["n_features"] = np.zeros(k_fold, dtype=int)
+    out["oof_scores"] = np.full(len(y), np.nan)
+    for k in range(k_fold):
+        train_idx, val_idx = _fold(k_indices, k)
+        tx_tr, tx_va, _ = _preprocess_fold(x, y, names, config, train_idx, val_idx)
+        w, _ = fit(method, y[train_idx], tx_tr, **fit_kwargs)
+        threshold, _ = best_threshold(predict_scores(method, w, tx_tr), y[train_idx])
+        del tx_tr
+        scores = predict_scores(method, w, tx_va)
+        out["threshold"][k] = threshold
+        out["f1"][k] = f1_score(y[val_idx], predict_labels(scores, threshold))
+        out["f1_val_best"][k] = best_threshold(scores, y[val_idx])[1]
+        out["n_features"][k] = tx_va.shape[1]
+        out["oof_scores"][val_idx] = scores
+    return out
+
+
+def cross_validation_ridge(x, y, names, config, lambdas, k_fold=5, seed=1):
+    """Ridge lambda grid by k-fold CV, the preprocessing fitted inside each fold.
+
+    For each stratified fold the preprocessing is fitted on the training part, then
+    the SVD of the training block is computed once and reused for every lambda of
+    the grid (see ridge_weights_svd). F1 uses, for each lambda, the threshold that
+    maximizes F1 on the training scores of the fold (as cross_validate).
+
+    Args:
+        x: raw data, shape=(N, D); y: labels in {-1, 1}, shape=(N,)
+        names: the D column names; config: preprocessing config (src/pipeline.py)
+        lambdas: grid, shape=(L,)
+
+    Returns:
+        dict with best_lambda (highest mean validation F1) and, shape=(L,): val_f1,
+        val_loss, train_loss (means over the folds; losses = 1/2 MSE, as in
+        implementations.py)
+    """
+    y = np.asarray(y, dtype=float)
     lambdas = np.asarray(lambdas, dtype=float)
-    k_indices = build_k_indices(len(y), k_fold, seed)
+    k_indices = stratified_k_indices(y, k_fold, seed)
+    val_f1 = np.zeros((k_fold, len(lambdas)))
     val_losses = np.zeros((k_fold, len(lambdas)))
     train_losses = np.zeros((k_fold, len(lambdas)))
 
     for k in range(k_fold):
-        val_idx = k_indices[k]
-        train_idx = np.concatenate([k_indices[j] for j in range(k_fold) if j != k])
-        x_tr, y_tr = tx[train_idx], y[train_idx]
-        x_va, y_va = tx[val_idx], y[val_idx]
+        train_idx, val_idx = _fold(k_indices, k)
+        tx_tr, tx_va, _ = _preprocess_fold(x, y, names, config, train_idx, val_idx)
+        y_tr, y_va = y[train_idx], y[val_idx]
 
-        w_all = ridge_weights_svd(y_tr, x_tr, lambdas)  # (L, D)
+        w_all = ridge_weights_svd(y_tr, tx_tr, lambdas)  # (L, D)
         # predictions for every lambda at once: (n_samples, L)
-        train_losses[k] = np.mean((y_tr[:, None] - x_tr @ w_all.T) ** 2, axis=0) / 2
-        val_losses[k] = np.mean((y_va[:, None] - x_va @ w_all.T) ** 2, axis=0) / 2
+        scores_tr, scores_va = tx_tr @ w_all.T, tx_va @ w_all.T
+        train_losses[k] = np.mean((y_tr[:, None] - scores_tr) ** 2, axis=0) / 2
+        val_losses[k] = np.mean((y_va[:, None] - scores_va) ** 2, axis=0) / 2
+        for i in range(len(lambdas)):
+            threshold, _ = best_threshold(scores_tr[:, i], y_tr)
+            val_f1[k, i] = f1_score(y_va, predict_labels(scores_va[:, i], threshold))
 
-    mean_val = val_losses.mean(axis=0)
-    mean_train = train_losses.mean(axis=0)
-    best_lambda = lambdas[np.argmin(mean_val)]
-    return best_lambda, mean_val, mean_train
+    mean_f1 = val_f1.mean(axis=0)
+    return dict(
+        best_lambda=lambdas[np.argmax(mean_f1)],
+        val_f1=mean_f1,
+        val_loss=val_losses.mean(axis=0),
+        train_loss=train_losses.mean(axis=0),
+    )
 
 
 def stratified_split(y, val_ratio=0.2, seed=1):

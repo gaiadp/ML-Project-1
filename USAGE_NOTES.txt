@@ -75,9 +75,10 @@ src/pipeline.py concatena i passi in quest'ordine (passi B di PLAN.md):
       tx = apply_preprocess(x, names, state)     # train, validation o test
       state["out_names"]                         # nomi delle colonne di tx ("bias" prima)
 - config e' un dict di flag, uno per passo (DEFAULT_CONFIG = pipeline completa,
-  V0_CONFIG = la prima pipeline). Per l'ablation: dict(DEFAULT_CONFIG, flag=False).
-  run.py usa ancora V0_CONFIG: stessa submission di prima, finche' la pipeline nuova
-  non e' validata in CV.
+  V0_CONFIG = baseline: codici -> NaN, colonne con > 50% NaN tolte, mediana, one-hot
+  delle nominali). Per l'ablation: dict(DEFAULT_CONFIG, flag=False).
+  run.py usa V0_CONFIG finche' la pipeline completa non e' validata in CV. La prima
+  submission era dict(V0_CONFIG, one_hot=False) (test in tests/test_pipeline.py).
 - y_train serve perche' keep_informative / missing_indicators scelgono le colonne in
   base alla differenza di prevalenza MICHD tra righe NaN e righe con risposta
   (>= 3 punti, >= 500 righe per lato). Con entrambi a False si puo' passare None.
@@ -89,8 +90,13 @@ src/pipeline.py concatena i passi in quest'ordine (passi B di PLAN.md):
   solo-cellulare).
 - convert_units e fill_skip_logic modificano x IN PLACE (per non copiare ~800 MB):
   chiamarle sull'output di codes_to_nan, che e' gia' una copia.
-- Le nominali restano codici numerici (il one-hot e' il passo B9, non ancora fatto);
-  le binarie 1/2 diventano 1/0 (1 = codice 1 del codebook: "si'" per le domande, ma
+- Le nominali (NOMINAL in src/feature_types.py) diventano colonne one-hot "NOME=valore"
+  (passo B9, one_hot=True, anche in V0_CONFIG). Solo in DEFAULT_CONFIG: anche le
+  ordinali di ONE_HOT_ORDINAL (_SMOKER3, LASTSMK2, _PACAT1, CHECKUP1: prevalenza che
+  sale e scende lungo i codici, one_hot_ordinal=True) e le colonne di BINNED,
+  raggruppate in classi (PHYSHLTH: 0, 1-7, 8-14, 15-21, 22-29, 30 giorni; la colonna
+  originale ha tutti i giorni, raggruppati per togliere il rumore dei valori rari;
+  B10, binning=True). Le binarie 1/2 diventano 1/0 (1 = codice 1 del codebook: "si'" per le domande, ma
   "nessun fattore di rischio" per le _RF*).
 
 - FIT SOLO SUL TRAINING. Tutte le statistiche (mediane, media/std, maschera delle
@@ -115,6 +121,10 @@ src/pipeline.py concatena i passi in quest'ordine (passi B di PLAN.md):
   Con il one-hot ogni categoria ha il suo peso.
 - Funzionamento: (x_col[:, None] == categories[None, :]) crea una matrice (N, K) con
   1 nella colonna della categoria della riga e 0 altrove.
+- Nella pipeline (B9) lo fa fit_one_hot_categories: categorie fissate sul training,
+  il valore piu' frequente e' il riferimento (riga tutta a 0, niente collinearita' col
+  bias), i valori con < one_hot_min_rows (500) righe, i NaN (gia' imputati) e i valori
+  mai visti finiscono nel riferimento. A mano:
 - Le categorie vanno fissate sul training e riusate:
       enc_tr, cats = one_hot_encode(x_train[:, j])
       enc_te, _    = one_hot_encode(x_test[:, j], categories=cats)
@@ -142,6 +152,16 @@ src/pipeline.py concatena i passi in quest'ordine (passi B di PLAN.md):
 - Feature ridondanti (es. 5 versioni dell'eta': _AGE80, _AGEG5YR, _AGE_G, _AGE65YR,
   e MAXVO2_/FC60_ calcolate dall'eta'; _RFCHOL = TOLDHI2 ricodificata;
   _DRDXAR1 = HAVARTH3) creano collinearita': tenerne una per gruppo.
+  experiments/eda.py A7 confronta tutte le coppie di colonne grezze (prima di one-hot
+  e classi) -> build/eda/redundancy.txt: proposta automatica, famiglie di colonne
+  collegate e verifica di ogni voce di REDUNDANT (src/feature_types.py), la lista
+  che la pipeline toglie con drop_redundant=True (la pipeline non legge il .txt).
+  Una colonna va in REDUNDANT solo se: e' funzione di quella tenuta (U >= 0.95) o
+  la stessa grandezza (|r| >= 0.999), il codebook lo conferma, quella tenuta e'
+  one-hot o binaria (il modello lineare la ricostruisce esattamente) e hanno gli
+  stessi NaN. I raggruppamenti di una colonna numerica (_AGE65YR, _RFHLTH, ...) e le
+  versioni per una sola fascia d'eta' (_HCVU651, _FLSHOT6, _PNEUMO2) restano:
+  toglierli abbassava l'F1 di validazione.
 
 
 6. I 6 METODI  (implementations.py)
