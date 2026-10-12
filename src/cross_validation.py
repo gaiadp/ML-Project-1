@@ -85,7 +85,8 @@ def cross_validate(x, y, names, config, method, k_fold=5, seed=1, **fit_kwargs):
         **fit_kwargs: lambda_, gamma, max_iters, ... for src.models.fit
 
     Returns:
-        dict with, per fold (shape=(k_fold,)): f1, f1_val_best, threshold, n_features;
+        dict with f1_mean, f1_std (mean and standard deviation of f1 over the
+        folds); per fold (shape=(k_fold,)): f1, f1_val_best, threshold, n_features;
         and oof_scores, shape=(N,): validation score of each row (out of fold)
     """
     y = np.asarray(y)
@@ -105,6 +106,8 @@ def cross_validate(x, y, names, config, method, k_fold=5, seed=1, **fit_kwargs):
         out["f1_val_best"][k] = best_threshold(scores, y[val_idx])[1]
         out["n_features"][k] = tx_va.shape[1]
         out["oof_scores"][val_idx] = scores
+    out["f1_mean"] = float(out["f1"].mean())
+    out["f1_std"] = float(out["f1"].std())
     return out
 
 

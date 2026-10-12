@@ -48,6 +48,8 @@ def test_preprocessing_never_sees_the_validation_rows(monkeypatch):
     assert np.isfinite(out["oof_scores"]).all()
     assert out["f1"].shape == (4,) and np.all((out["f1"] >= 0) & (out["f1"] <= 1))
     assert np.all(out["f1_val_best"] >= out["f1"] - 1e-12)
+    assert np.isclose(out["f1_mean"], out["f1"].mean())
+    assert np.isclose(out["f1_std"], out["f1"].std())
 
 
 def test_cross_validation_ridge_matches_ridge_regression(monkeypatch):
