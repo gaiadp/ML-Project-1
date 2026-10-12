@@ -12,7 +12,8 @@ CONVERTED: mixed-units columns that the dataset also provides already converted 
 one unit; the pipeline keeps only the converted column.
 
 REDUNDANT, NOT_MONOTONE, LARGE_NOMINAL, LOG1P, SQUARED: choices of the pipeline
-steps B2, B9, B10, B11 that come from the EDA (A6, A7, A9).
+steps B2, B9, B10, B11 (listed in src/pipeline.py) that come from the analyses A6,
+A7, A9 of experiments/eda.py.
 """
 
 _ID_DATE = "interview id or date"
@@ -429,9 +430,10 @@ CONVERTED = {
     "STRENGTH": "STRFREQ_",  # times per week
 }
 
-# The lists below come from the EDA (experiments/eda.py, PLAN.md A6, A7, A9). They
-# were chosen looking at the labels of the whole training set: the cross-validation
-# score of the pipeline that uses them is slightly optimistic.
+# The lists below come from the analyses A6 (feature-target relation), A7
+# (redundancy) and A9 (ranges and outliers) of experiments/eda.py, whose tables are
+# in build/eda/. They were chosen looking at the labels of the whole training set:
+# the cross-validation score of the pipeline that uses them is slightly optimistic.
 
 # B2. duplicate -> the column that determines it, which is kept (A7: same quantity,
 # |r| >= 0.98, or a function of it, U >= 0.95, with the kept column encoded so that

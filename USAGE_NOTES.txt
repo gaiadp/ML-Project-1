@@ -70,7 +70,8 @@ Ordine consigliato:
   codes_to_nan -> scelta/rimozione colonne -> imputazione -> encoding/espansioni
   -> standardizzazione -> add_bias
 
-src/pipeline.py concatena i passi in quest'ordine (passi B di PLAN.md):
+src/pipeline.py concatena i passi in quest'ordine (passi B1-B13, elencati nella
+docstring di src/pipeline.py):
       state = fit_preprocess(x_train, y_train, names, config)
       tx = apply_preprocess(x, names, state)     # train, validation o test
       state["out_names"]                         # nomi delle colonne di tx ("bias" prima)

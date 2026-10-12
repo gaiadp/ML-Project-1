@@ -1,18 +1,20 @@
 """Exploratory data analysis of the training set, one function per analysis.
 
 Run with the Run button on this file, or:  python experiments/eda.py
-Text tables go to build/eda/ (gitignored).
+Text tables go to build/eda/ (gitignored). The analyses are named A1-A9 here and in
+the comments of src/; the pipeline steps they motivate are B1-B13 (src/pipeline.py).
 
-Structural overview (structural_overview): shapes and ids, constant and near-constant
-columns, MICHD signal of the columns dropped for domain reasons (DOMAIN_DROP).
+Structural overview (structural_overview, A1): shapes and ids, constant and
+near-constant columns, MICHD signal of the columns dropped for domain reasons
+(DOMAIN_DROP).
 
-Feature types (feature_types_table): the type of each column in FEATURE_TYPES,
+Feature types (feature_types_table, A2): the type of each column in FEATURE_TYPES,
 next to an automatic guess from its values, to review the choices made by hand.
 
-Special codes (special_codes_audit): what codes_to_nan changes in each column, and
-the code-like values it keeps (real answers that need care, or missing rules).
+Special codes (special_codes_audit, A3): what codes_to_nan changes in each column,
+and the code-like values it keeps (real answers that need care, or missing rules).
 
-Missing values (missingness_analysis): how many, label leakage scan, groups of
+Missing values (missingness_analysis, A4): how many, label leakage scan, groups of
 columns missing together, MICHD prevalence when a value is missing.
 
 A5-A9 look at the values the model sees: after codes_to_nan and the label-free steps

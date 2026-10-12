@@ -2,7 +2,8 @@
 feature removal, imputation, standardization.
 
 Fit statistics (means, stds, ...) on the training split only, then apply them to validation/test.
-src/pipeline.py chains these steps (the B steps of PLAN.md).
+src/pipeline.py chains these steps; its docstring lists them as B1-B13, the names
+used in the comments below.
 """
 
 import numpy as np

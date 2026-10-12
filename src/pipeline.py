@@ -1,7 +1,8 @@
 """Preprocessing pipeline: statistics fitted on the training set only, then applied
 unchanged to training, validation and test.
 
-Steps (block B of PLAN.md), each one switched on or off by the config for the ablation:
+Steps, named B1-B13 in the comments of src/ (B = data cleaning and features), each
+one switched on or off by the config for the ablation:
     B1  codes_to_nan        BRFSS special codes -> NaN (don't know) or 0 (none)
     B3  convert_units       one numeric scale per column; raw mixed units dropped
     B4  skip_logic_fill     NaN of the questions that were not asked -> "no" / 0
