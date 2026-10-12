@@ -3,6 +3,8 @@
 Run with the Run button on this file, or:  python experiments/eda.py
 Text tables go to build/eda/, exploratory figures to build/eda/figures/ (both
 gitignored), the figures for the report to report/figures/.
+The analyses are named A1-A9 here and in the comments of src/; the pipeline steps
+they motivate are B1-B13 (listed in src/pipeline.py).
 
 Structural overview (structural_overview, A1): shapes and ids, constant and
 near-constant columns, MICHD signal of the columns dropped for domain reasons
@@ -187,7 +189,7 @@ REVIEW = 0.9
 # e.g. _HCVU651 = HLTHPLN1 for age 18-64 only)
 NAN_BLOCK = 0.05
 NAN_TOLERANCE = 0.02
-# A9: clipping percentiles to try (proposal for B10)
+# A9: clipping percentiles to try (a transform that is not a pipeline step)
 CLIP_PERCENTILES = (0.5, 99.5)
 # A9: clipping or log1p helps when |r| grows by at least this factor and by at
 # least R_MIN_GAIN (the standard error of r is ~0.002 with 300k rows)
@@ -1043,7 +1045,7 @@ def target_relation(x, y01, names, feats, stats):
         (f"B9 nominal with > {MAX_ONE_HOT} values (group rare ones?)", "one-hot, many"),
         ("nominal with too few rows per value", "rare"),
         ("B9 one-hot, ordinal not monotone", "one-hot: not monotone"),
-        ("B10/B11 curved numeric", "curved"),
+        ("curved numeric: log / squared terms (not pipeline steps)", "curved"),
         ("not linear, not curved (bins?)", "not linear"),
         ("weak signal", "weak signal"),
     ):
@@ -1280,7 +1282,9 @@ def redundancy(x, names, feats, stats):
     def row(name, text):
         s = stats[name]
         mark = "R" if name in REDUNDANT else " "
-        return f"{mark} {name:10s} {pct(s['nan_frac']):>5s} {1000 * s['mi']:6.2f}  {text}"
+        return (
+            f"{mark} {name:10s} {pct(s['nan_frac']):>5s} {1000 * s['mi']:6.2f}  {text}"
+        )
 
     lines = [
         "Redundancy (experiments/eda.py)",
@@ -1349,9 +1353,7 @@ def redundancy(x, names, feats, stats):
             elif not (same[a, b] or rebuilds(a)):
                 problems.append(f"{a_name} does not rebuild it")
             if abs(nan_frac[a] - nan_frac[b]) > NAN_TOLERANCE:
-                problems.append(
-                    f"NaN {pct(nan_frac[b])}% vs {pct(nan_frac[a])}%"
-                )
+                problems.append(f"NaN {pct(nan_frac[b])}% vs {pct(nan_frac[a])}%")
             ok = not problems
         verdict = "ok" if ok else "NO (" + ", ".join(problems) + ")"
         return (
@@ -1364,9 +1366,7 @@ def redundancy(x, names, feats, stats):
         f"== Check of REDUNDANT (src/feature_types.py, {len(REDUNDANT)} columns):"
         " b dropped as a duplicate of a ==",
     ]
-    lines += [
-        f"  {b:10s} <- {a:10s} {check(b, a)}" for b, (a, _) in REDUNDANT.items()
-    ]
+    lines += [f"  {b:10s} <- {a:10s} {check(b, a)}" for b, (a, _) in REDUNDANT.items()]
     lines += [
         "",
         f"== Check of CONVERTED ({len(CONVERTED)} raw columns b, converted version a,"
@@ -1479,26 +1479,19 @@ def ranges_and_outliers(x, y01, names, feats):
     plausible range (PLAUSIBLE), MICHD % above the 99th percentile and below it, and
     |r| with MICHD of the raw values, of the values clipped at CLIP_PERCENTILES, and
     of log1p of the clipped values (non-negative columns). A transform is proposed
-    for B10 when it raises |r| by R_GAIN and by R_MIN_GAIN: a linear model sees the
-    column better.
-
-    Then, on the values as B10 would leave them (clipped, and log1p where proposed),
-    the R^2 of a line and of a parabola through the log-odds (log_odds_fit): a
-    column still curved after B10 (CURVATURE_GAIN, WEAK_SIGNAL) is proposed for a
-    squared term in B11.
+    when it raises |r| by R_GAIN and by R_MIN_GAIN: a linear model sees the column
+    better. Clipping and log1p are not steps of the pipeline (src/pipeline.py).
     """
     lines = [
         "Ranges and outliers of the count and continuous columns (experiments/eda.py)",
         f"(answered rows; clip at percentiles {CLIP_PERCENTILES}; MICHD % above /"
-        " below the 99th percentile; out = answers outside the plausible range;",
-        " R2 line / parab: shape of the log-odds after the B10 transform)",
+        " below the 99th percentile; out = answers outside the plausible range)",
         "",
         f"{'column':10s} {'type':10s} {'min':>8s} {'p0.5':>8s} {'p50':>8s} "
         f"{'p99.5':>8s} {'max':>8s} {'skew':>6s} {'out':>5s} {'>p99':>5s} "
-        f"{'rest':>5s} {'|r|':>6s} {'clip':>6s} {'log':>6s} {'line':>5s} "
-        f"{'parab':>5s}  hint",
+        f"{'rest':>5s} {'|r|':>6s} {'clip':>6s} {'log':>6s}  hint",
     ]
-    hints, curved = {}, []
+    hints = {}
     for j in feats:
         name, ftype = names[j], FEATURE_TYPES[names[j]]
         # the mixed-units columns left are numbers after convert_units
@@ -1523,25 +1516,15 @@ def ranges_and_outliers(x, y01, names, feats):
         elif r_clip >= R_GAIN * r_raw and r_clip - r_raw >= R_MIN_GAIN:
             hint = "clip"
         hints[name] = hint
-        transformed = np.log1p(clipped) if hint == "clip + log1p" else clipped
-        codes, positions, _ = discretize(transformed, CONTINUOUS)
-        r2_line, r2_parabola, signal, _ = log_odds_fit(codes, positions, yv)
-        if r2_parabola - r2_line >= CURVATURE_GAIN and signal >= WEAK_SIGNAL:
-            curved.append(name)
         lines.append(
             f"{name:10s} {ftype:10s} {fmt_value(q[0]):>8s} {fmt_value(q[1]):>8s} "
             f"{fmt_value(q[2]):>8s} {fmt_value(q[4]):>8s} {fmt_value(q[5]):>8s} "
             f"{skew:6.1f} {n_out:5d} {pct(prev_top):>5s} {pct(yv[~top].mean()):>5s} "
-            f"{r_raw:6.3f} {r_clip:6.3f} {r_log:6.3f} {r2_line:5.2f} "
-            f"{r2_parabola:5.2f}  {hint}"
+            f"{r_raw:6.3f} {r_clip:6.3f} {r_log:6.3f}  {hint}"
         )
-    lines += ["", "== Proposals for B10 / B11 =="]
-    proposals = [
-        ("B10 clip + log1p", [n for n, h in hints.items() if h == "clip + log1p"]),
-        ("B10 clip only", [n for n, h in hints.items() if h == "clip"]),
-        ("B11 squared term: still curved after B10", curved),
-    ]
-    for title, chosen in proposals:
+    lines += ["", "== Proposed transforms (clip, log1p: not pipeline steps) =="]
+    for title in ("clip + log1p", "clip"):
+        chosen = [n for n, h in hints.items() if h == title]
         lines.append(f"{title} ({len(chosen)}):")
         lines.append(textwrap.indent(textwrap.fill(", ".join(chosen), 84), "    "))
     path = save_lines(lines, "outliers.txt")

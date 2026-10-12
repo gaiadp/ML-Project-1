@@ -9,12 +9,9 @@ from src.feature_types import (  # noqa: E402
     BINNED,
     CONTINUOUS,
     CONVERTED,
-    COUNT,
     DOMAIN_DROP,
     DROP,
     FEATURE_TYPES,
-    LARGE_NOMINAL,
-    LOG1P,
     MIXED_UNITS,
     ONE_HOT_ORDINAL,
     ORDINAL,
@@ -39,19 +36,6 @@ def test_drop_type_matches_domain_drop():
 
 def test_every_dropped_column_has_a_reason():
     assert all(isinstance(r, str) and r for r in DOMAIN_DROP.values())
-
-
-def test_eda_lists():
-    # names from the EDA: a typo would silently skip a column in the pipeline
-    assert all(FEATURE_TYPES[name] != DROP for name in REDUNDANT)
-    for kept_name in REDUNDANT.values():
-        assert kept_name not in REDUNDANT and FEATURE_TYPES[kept_name] != DROP
-    assert all(FEATURE_TYPES[name] == ORDINAL for name in NOT_MONOTONE)
-    assert all(FEATURE_TYPES[name] == NOMINAL for name in LARGE_NOMINAL)
-    numeric = (COUNT, CONTINUOUS, MIXED_UNITS)
-    assert all(FEATURE_TYPES[name] in numeric for name in LOG1P + SQUARED)
-    lists = [list(REDUNDANT), NOT_MONOTONE, LARGE_NOMINAL, LOG1P, SQUARED]
-    assert all(len(set(names)) == len(names) for names in lists)
 
 
 def test_converted_columns():

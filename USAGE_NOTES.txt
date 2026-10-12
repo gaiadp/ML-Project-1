@@ -14,8 +14,8 @@ src/ e implementations.py. Ogni punto indica dove si trova il codice interessato
   "no" ha ~91% di accuracy -> valutare con F1, pesare le classi o regolare la soglia
   di decisione (0.5 quasi sempre troppo alta). La soglia va scelta su validation,
   mai sul test.
-- Caricamento lento: np.genfromtxt su x_train impiega circa 1 minuto. Conviene salvare
-  una volta gli array in build/ (np.savez) e poi ricaricarli con np.load.
+- Caricamento lento: np.genfromtxt su x_train impiega minuti. src.data.load_data()
+  salva gli array una volta in build/data.npz (np.savez) e poi li ricarica con np.load.
 - Memoria: x_train e' 328135 x 321 float64 = ~840 MB. Espansioni polinomiali o
   one-hot su molte colonne la moltiplicano: selezionare le feature PRIMA di espandere
   (oppure usare float32).
@@ -78,6 +78,10 @@ docstring di src/pipeline.py):
 - config e' un dict di flag, uno per passo (DEFAULT_CONFIG = pipeline completa,
   V0_CONFIG = baseline: codici -> NaN, colonne con > 50% NaN tolte, mediana, one-hot
   delle nominali). Per l'ablation: dict(DEFAULT_CONFIG, flag=False).
+  Le liste fisse usate dai passi (REDUNDANT, ONE_HOT_ORDINAL, BINNED in
+  src/feature_types.py) vengono dall'EDA (experiments/eda.py), che guarda le
+  etichette di tutto il training: il punteggio in CV e' un po' ottimista (dirlo nel
+  report).
   run.py usa V0_CONFIG finche' la pipeline completa non e' validata in CV. La prima
   submission era dict(V0_CONFIG, one_hot=False) (test in tests/test_pipeline.py).
 - y_train serve perche' keep_informative / missing_indicators scelgono le colonne in
@@ -93,23 +97,14 @@ docstring di src/pipeline.py):
   chiamarle sull'output di codes_to_nan, che e' gia' una copia.
 - Le nominali (NOMINAL in src/feature_types.py) diventano colonne one-hot "NOME=valore"
   (passo B9, one_hot=True, anche in V0_CONFIG). Solo in DEFAULT_CONFIG: anche le
-  ordinali di ONE_HOT_ORDINAL (_SMOKER3, LASTSMK2, _PACAT1, CHECKUP1: prevalenza che
-  sale e scende lungo i codici, one_hot_ordinal=True) e le colonne di BINNED,
-  raggruppate in classi (PHYSHLTH: 0, 1-7, 8-14, 15-21, 22-29, 30 giorni; la colonna
-  originale ha tutti i giorni, raggruppati per togliere il rumore dei valori rari;
-  B10, binning=True). Le binarie 1/2 diventano 1/0 (1 = codice 1 del codebook: "si'" per le domande, ma
-  "nessun fattore di rischio" per le _RF*).
-- Le liste fisse usate dai passi (REDUNDANT, NOT_MONOTONE, LARGE_NOMINAL, LOG1P,
-  SQUARED in src/feature_types.py) vengono dall'EDA, guardando le etichette di TUTTO
-  il training: il punteggio in CV della pipeline che le usa e' un po' ottimista
-  (dirlo nel report). Le soglie in righe (min_missing_rows, min_category_rows = 500)
-  sono pensate per ~260k righe: nei test con dati finti vanno abbassate.
-- Ordine dentro la pipeline: imputazione (B7) -> 1/2 -> 1/0 (B8) -> clip e log1p
-  (B10) -> one-hot (B9) e quadrati (B11) -> standardizzazione. Il one-hot viene
-  DOPO l'imputazione: le nominali hanno la moda come valore imputato, quindi i NaN
-  finiscono nella categoria di riferimento (vedi sez. 4).
-- Con tutti i passi la matrice ha ~430 colonne (~1 GB per il training intero in
-  float64): il fit richiede ~4 GB di RAM di picco, compresi i dati caricati.
+  ordinali di ONE_HOT_ORDINAL (one_hot_ordinal=True): _SMOKER3, LASTSMK2, _PACAT1,
+  CHECKUP1 hanno una prevalenza che sale e scende lungo i codici; CHOLCHK e _ASTHMS1
+  sono one-hot perche' cosi' ricostruiscono le colonne tolte come duplicati
+  (REDUNDANT). E le colonne di BINNED, raggruppate in classi (PHYSHLTH: 0, 1-7, 8-14,
+  15-21, 22-29, 30 giorni; la colonna originale ha tutti i giorni, raggruppati per
+  togliere il rumore dei valori rari; B10, binning=True).
+- Le binarie 1/2 diventano 1/0 (B8; 1 = codice 1 del codebook: "si'" per le domande,
+  ma "nessun fattore di rischio" per le _RF*).
 
 - FIT SOLO SUL TRAINING. Tutte le statistiche (mediane, media/std, maschera delle
   colonne, categorie del one-hot) si calcolano sul training e si RIUSANO su validation
@@ -150,16 +145,6 @@ docstring di src/pipeline.py):
   (o GD non regolarizzato) togliere una colonna di riferimento: enc[:, 1:].
 - Non usarlo su colonne con tanti valori distinti (eta', peso, giorni): troppe colonne
   e pochi esempi per categoria. Per quelle: termini lineari/polinomiali o binning.
-- Nella pipeline (B9): fit_categories(x_col, min_rows) sceglie le categorie sul
-  training: i valori con almeno min_rows righe, TRANNE il piu' frequente, che fa da
-  riferimento (riga di zeri, effetto nel bias). Cosi' non c'e' collinearita' esatta
-  con il bias. Nella riga di zeri finiscono anche i valori rari, quelli mai visti e
-  i NaN (imputati con la moda). Il peso di una colonna "EMPLOY1=7" si legge quindi
-  come differenza rispetto alla risposta piu' comune.
-- One-hot anche per le ordinali NON monotone (NOT_MONOTONE, es. _SMOKER3: chi ha
-  smesso ha piu' MICHD di chi fuma e di chi non ha mai fumato, perche' e' piu'
-  anziano). Le nominali con molti valori (_STATE, EXRACT11, EXRACT21) danno ~110
-  colonne: con one_hot_large=False vengono tolte.
 
 
 5. ESPANSIONI DI FEATURE  (src/features.py: build_poly, pairwise_products)
@@ -212,6 +197,13 @@ docstring di src/pipeline.py):
 ----------------------------
 - Split/k-fold stratificati (stessa percentuale di positivi in ogni fold), con seed
   fisso per rendere i risultati riproducibili.
+- src/cross_validation.py: cross_validate(x, y, names, config, method, ...) e
+  cross_validation_ridge(x, y, names, config, lambdas) vogliono i dati GREZZI e
+  fittano la pipeline dentro ogni fold, solo sulla parte di training. La soglia di
+  decisione si sceglie sugli score di TRAINING del fold; "f1" (con media f1_mean e
+  deviazione standard f1_std sui fold) e' il numero da riportare, "f1_val_best"
+  (soglia scelta sulla validazione stessa) e' ottimista come il singolo split di
+  run.py. Per l'ablation: stessa chiamata con dict(DEFAULT_CONFIG, flag=False).
 - run.py deve riprodurre ESATTAMENTE la nostra migliore submission: fissare i seed e
   usare lo stesso preprocessing (con statistiche fittate sul training completo).
 - Gli Id della submission sono quelli di x_test (test_ids di load_csv_data), nello

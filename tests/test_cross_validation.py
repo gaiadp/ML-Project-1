@@ -37,7 +37,9 @@ def test_preprocessing_never_sees_the_validation_rows(monkeypatch):
         return fit_preprocess(x_train, y_train, names, config)
 
     monkeypatch.setattr(cv, "fit_preprocess", spy)
-    out = cv.cross_validate(x, y, names, CONFIG, "ridge_regression", k_fold=4, lambda_=1e-3)
+    out = cv.cross_validate(
+        x, y, names, CONFIG, "ridge_regression", k_fold=4, lambda_=1e-3
+    )
     folds = cv.stratified_k_indices(y, 4, seed=1)
     ids = x[:, names.index("SEQNO")]
     assert len(seen) == 4

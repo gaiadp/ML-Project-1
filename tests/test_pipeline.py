@@ -141,12 +141,8 @@ def fake_brfss(n=200):
         "EXERANY2": np.where(no_exercise, 2.0, 1.0),  # B4 gate, B8 binary
         "PAFREQ1_": np.where(no_exercise, np.nan, 3.0),  # B4: 0 when not asked
         "SEX": 1.0 + (i // 2) % 2,  # B8 binary
-        "MARITAL": np.where(i % 11 == 0, 9.0, 1.0 + i % 6),  # B7, B9 nominal
+        "MARITAL": np.where(i % 11 == 0, 9.0, 1.0 + i % 6),  # B7 nominal
         "GENHLTH": np.where(i % 7 == 0, 7.0, 1.0 + i % 5),
-        "_RFHLTH": np.where(i % 5 >= 3, 2.0, 1.0),  # B2: duplicate of GENHLTH
-        "_STATE": 1.0 + i % 8,  # B9: nominal with many values
-        "PA1MIN_": (i % 10.0) ** 3,  # B10: skewed, log1p
-        "_BMI5": 18.0 + i % 25,  # B11: squared term
         "INSULIN": np.where(asked, 1.0, np.nan),  # B5/B6: 90% NaN, informative
         "MOSTLY_NAN": np.where(i < 20, 1.0 + i % 2, np.nan),  # B5: 90% NaN
     }
@@ -154,29 +150,16 @@ def fake_brfss(n=200):
     return np.column_stack([columns[name] for name in names]), y, names
 
 
-# thresholds in rows lowered for the 200 rows of fake_brfss
-FAKE_CONFIG = dict(DEFAULT_CONFIG, min_missing_rows=5, min_category_rows=5)
-
-
 def test_full_pipeline():
     x, y, names = fake_brfss()
-    state = fit_preprocess(x, y, names, FAKE_CONFIG)
+    state = fit_preprocess(x, y, names, dict(DEFAULT_CONFIG, min_missing_rows=5))
     out = state["out_names"]
     assert out[0] == "bias"
-    dropped = ["SEQNO", "HAREHAB1", "WEIGHT2", "MOSTLY_NAN", "_RFHLTH"]
-    for name in dropped + ["MARITAL", "_STATE"]:
+    for name in ["SEQNO", "HAREHAB1", "WEIGHT2", "MOSTLY_NAN"]:
         assert name not in out
-    for name in ["WTKG3", "PAFREQ1_", "INSULIN", "INSULIN_isnan", "_BMI5^2"]:
+    for name in ["WTKG3", "PAFREQ1_", "INSULIN", "INSULIN_isnan"]:
         assert name in out
     assert len(out) == len(set(out))
-    # one-hot: one column per value but the most frequent one (the reference)
-    assert sum(name.startswith("MARITAL=") for name in out) == 5
-    assert sum(name.startswith("_STATE=") for name in out) == 7
-    # PA1MIN_ is clipped and then log1p; MARITAL, a one-hot column, is not clipped
-    k = list(state["cols"]).index(names.index("PA1MIN_"))
-    assert state["log"][k] and np.isfinite(state["high"][k])
-    k = list(state["cols"]).index(names.index("MARITAL"))
-    assert not state["log"][k] and state["high"][k] == np.inf
 
     tx = apply_preprocess(x, names, state)
     assert tx.shape == (len(x), len(out))
@@ -284,10 +267,9 @@ def test_labels_are_needed_only_for_the_missing_steps():
 
 def test_each_step_can_be_switched_off():
     x, y, names = fake_brfss()
-    base = FAKE_CONFIG
+    base = dict(DEFAULT_CONFIG, min_missing_rows=5)
     variants = [dict(base, **{key: False}) for key, v in base.items() if v is True]
     variants += [dict(base, impute="median"), dict(base, max_missing_frac=1.0)]
-    variants += [dict(base, poly_degree=1), dict(base, poly_degree=3)]
     for config in variants:
         state = fit_preprocess(x, y, names, config)
         tx = apply_preprocess(x[:50], names, state)
