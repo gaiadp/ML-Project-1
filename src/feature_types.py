@@ -65,6 +65,10 @@ DOMAIN_DROP = {
     "HAREHAB1": "label leakage: asked only after a heart attack",
 }
 
+# the columns of DOMAIN_DROP that reveal the label: dropped by every pipeline config,
+# also when domain_drop is switched off for the ablation
+LABEL_LEAKAGE = ("HAREHAB1",)
+
 DROP = "drop"  # not used as a feature (listed in DOMAIN_DROP)
 BINARY = "binary"  # two answers, mostly 1 = yes, 2 = no
 ORDINAL = "ordinal"  # ordered codes, e.g. GENHLTH 1 excellent .. 5 poor

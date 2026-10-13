@@ -7,7 +7,8 @@ one switched on or off by the config for the ablation:
     B3  convert_units       one numeric scale per column; raw mixed-units columns dropped
     B4  skip_logic_fill     NaN of the questions that were not asked -> "no" / 0
     B10 binning             count columns of BINNED -> bin index, one-hot by B9
-    B2  domain_drop         drop ids, survey design, label leakage (DOMAIN_DROP)
+    B2  domain_drop         drop ids, survey design (DOMAIN_DROP); the label leakage
+                            columns (LABEL_LEAKAGE) are dropped also without it
         drop_redundant      drop the duplicates of other columns (REDUNDANT)
     B5  max_missing_frac    drop columns with too many NaN ...
         keep_informative    ... except those whose missingness is informative
@@ -35,6 +36,7 @@ from src.feature_types import (
     CONVERTED,
     DOMAIN_DROP,
     FEATURE_TYPES,
+    LABEL_LEAKAGE,
     NOMINAL,
     ONE_HOT_ORDINAL,
     REDUNDANT,
@@ -107,7 +109,7 @@ def _clean(x, names, config):
 
 def _candidate_columns(names, config):
     """B2, B3: bool mask of the columns that can be features (fixed lists)."""
-    drop = set()
+    drop = set(LABEL_LEAKAGE)  # with any config
     if config["domain_drop"]:
         drop |= set(DOMAIN_DROP)
     if config["drop_redundant"]:

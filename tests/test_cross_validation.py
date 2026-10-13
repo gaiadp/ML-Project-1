@@ -54,6 +54,16 @@ def test_preprocessing_never_sees_the_validation_rows(monkeypatch):
     assert np.isclose(out["f1_std"], out["f1"].std())
 
 
+def test_cross_validate_sgd_is_reproducible():
+    x, y, names = fake_brfss()
+    kwargs = dict(k_fold=4, gamma=0.01, max_iters=50)
+    np.random.seed(0)
+    a = cv.cross_validate(x, y, names, CONFIG, "mean_squared_error_sgd", **kwargs)
+    np.random.seed(123)
+    b = cv.cross_validate(x, y, names, CONFIG, "mean_squared_error_sgd", **kwargs)
+    np.testing.assert_array_equal(a["oof_scores"], b["oof_scores"])
+
+
 def test_cross_validation_ridge_matches_ridge_regression(monkeypatch):
     x, y, names = fake_brfss()
     lambdas = np.array([1e-4, 1e-2, 1.0])
