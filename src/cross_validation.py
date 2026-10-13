@@ -81,7 +81,7 @@ def cross_validate(x, y, names, config, method, k_fold=5, seed=1, **fit_kwargs):
         names: the D column names
         config: preprocessing config (src/pipeline.py)
         method: one of src.models.METHODS
-        k_fold, seed: folds and their seed
+        k_fold, seed: folds and their seed, also the seed of mean_squared_error_sgd
         **fit_kwargs: lambda_, gamma, max_iters, ... for src.models.fit
 
     Returns:
@@ -97,7 +97,7 @@ def cross_validate(x, y, names, config, method, k_fold=5, seed=1, **fit_kwargs):
     for k in range(k_fold):
         train_idx, val_idx = _fold(k_indices, k)
         tx_tr, tx_va, _ = _preprocess_fold(x, y, names, config, train_idx, val_idx)
-        w, _ = fit(method, y[train_idx], tx_tr, **fit_kwargs)
+        w, _ = fit(method, y[train_idx], tx_tr, seed=seed, **fit_kwargs)
         threshold, _ = best_threshold(predict_scores(method, w, tx_tr), y[train_idx])
         del tx_tr
         scores = predict_scores(method, w, tx_va)

@@ -12,6 +12,7 @@ from src.feature_types import (  # noqa: E402
     DOMAIN_DROP,
     DROP,
     FEATURE_TYPES,
+    LABEL_LEAKAGE,
     MIXED_UNITS,
     ONE_HOT_ORDINAL,
     ORDINAL,
@@ -32,6 +33,11 @@ def test_every_column_has_a_valid_type():
 def test_drop_type_matches_domain_drop():
     dropped = {name for name, t in FEATURE_TYPES.items() if t == DROP}
     assert dropped == set(DOMAIN_DROP)
+
+
+def test_label_leakage_columns_are_dropped():
+    assert set(LABEL_LEAKAGE) <= set(DOMAIN_DROP)
+    assert all(DOMAIN_DROP[n].startswith("label leakage") for n in LABEL_LEAKAGE)
 
 
 def test_every_dropped_column_has_a_reason():

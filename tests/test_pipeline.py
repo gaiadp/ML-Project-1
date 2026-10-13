@@ -257,6 +257,15 @@ def test_drop_redundant_step():
     assert all(any(n.startswith(name) for n in out) for name in pa)
 
 
+def test_label_leakage_is_dropped_without_domain_drop():
+    # HAREHAB1 is answered by positive rows only: its missingness is "informative"
+    x, y, names = fake_brfss()
+    config = dict(DEFAULT_CONFIG, min_missing_rows=5, domain_drop=False)
+    out = fit_preprocess(x, y, names, config)["out_names"]
+    assert "SEQNO" in out
+    assert not any(n.startswith("HAREHAB1") for n in out)
+
+
 def test_labels_are_needed_only_for_the_missing_steps():
     x, y, names = fake_brfss()
     with pytest.raises(ValueError):
