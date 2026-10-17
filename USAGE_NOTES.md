@@ -123,7 +123,7 @@ state["out_names"]                       # nomi delle colonne di tx ("bias" prim
 | B3 | `convert_units` | una scala numerica per colonna; tolte le colonne grezze a unità miste |
 | B4 | `skip_logic_fill` | NaN delle domande non poste → "no" / 0 |
 | B10 | `binning` | le colonne di `BINNED` (`PHYSHLTH`) → indice della classe, poi one-hot (B9) |
-| B2 | `domain_drop`, `drop_redundant` | toglie id / disegno del sondaggio / leakage (`DOMAIN_DROP`) e i 30 duplicati esatti (`REDUNDANT`) |
+| B2 | `domain_drop`, `drop_redundant`, `select_features` | toglie id / disegno del sondaggio / leakage (`DOMAIN_DROP`), i 30 duplicati esatti (`REDUNDANT`) e, solo in `V1_CONFIG`, le 112 colonne non scelte dall'EDA (`NOT_SELECTED`) |
 | B5 | `max_missing_frac`, `keep_informative` | toglie le colonne con troppi NaN, tranne quelle con NaN informativo |
 | B6 | `missing_indicators` | una colonna `isnan` per gruppo di colonne informative |
 | B7 | `impute` | mediana, oppure moda per binarie / nominali (`"by_type"`) |
@@ -134,11 +134,18 @@ state["out_names"]                       # nomi delle colonne di tx ("bias" prim
 - `config` è un dict di flag, uno per passo (`DEFAULT_CONFIG` = pipeline completa,
   `V0_CONFIG` = baseline: codici → NaN, colonne con > 50% NaN tolte, mediana, one-hot
   delle nominali). Per l'ablation: `dict(DEFAULT_CONFIG, flag=False)`.
-  Le liste fisse usate dai passi (`REDUNDANT`, `ONE_HOT_ORDINAL`, `BINNED` in
-  `src/feature_types.py`) vengono dall'EDA (`experiments/eda.py`), che guarda le etichette
+  Le liste fisse usate dai passi (`REDUNDANT`, `ONE_HOT_ORDINAL`, `BINNED`, `NOT_SELECTED`
+  in `src/feature_types.py`) vengono dall'EDA (`experiments/eda.py`), che guarda le etichette
   di tutto il training: il punteggio in CV è un po' ottimista (dirlo nel report).
   `run.py` usa `V0_CONFIG` finché la pipeline completa non è validata in CV. La prima
   submission era `dict(V0_CONFIG, one_hot=False)` (test in `tests/test_pipeline.py`).
+- **`V1_CONFIG`** = `DEFAULT_CONFIG` + selezione delle feature dall'EDA
+  (`select_features=True`): usa 124 colonne e toglie le 112 di `NOT_SELECTED`, ognuna con
+  la sua regola (R1: MI < 1 mbit; R2: moduli opzionali risposti da < 15%, se ne tiene una
+  colonna per modulo; R3: domande solo-fisso con risposte senza segnale; R4: `STREHAB1`,
+  copia di `CVDSTRK3` dopo B4). La selezione sostituisce B5 (`max_missing_frac=1.0`): una
+  colonna scelta resta anche con tanti NaN (es. `CVDASPRN`); B6 aggiunge comunque gli
+  indicatori. Va confrontata in CV con `DEFAULT_CONFIG` prima di usarla in `run.py`.
 - `y_train` serve perché `keep_informative` / `missing_indicators` scelgono le colonne in
   base alla differenza di prevalenza MICHD tra righe NaN e righe con risposta (≥ 3 punti,
   ≥ 500 righe per lato). Con entrambi a `False` si può passare `None`.

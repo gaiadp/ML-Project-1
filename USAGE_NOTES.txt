@@ -78,12 +78,19 @@ docstring di src/pipeline.py):
 - config e' un dict di flag, uno per passo (DEFAULT_CONFIG = pipeline completa,
   V0_CONFIG = baseline: codici -> NaN, colonne con > 50% NaN tolte, mediana, one-hot
   delle nominali). Per l'ablation: dict(DEFAULT_CONFIG, flag=False).
-  Le liste fisse usate dai passi (REDUNDANT, ONE_HOT_ORDINAL, BINNED in
+  Le liste fisse usate dai passi (REDUNDANT, ONE_HOT_ORDINAL, BINNED, NOT_SELECTED in
   src/feature_types.py) vengono dall'EDA (experiments/eda.py), che guarda le
   etichette di tutto il training: il punteggio in CV e' un po' ottimista (dirlo nel
   report).
   run.py usa V0_CONFIG finche' la pipeline completa non e' validata in CV. La prima
   submission era dict(V0_CONFIG, one_hot=False) (test in tests/test_pipeline.py).
+- V1_CONFIG = DEFAULT_CONFIG + selezione delle feature dall'EDA (select_features=True,
+  passo B2): usa 124 colonne e toglie le 112 di NOT_SELECTED, ognuna con la sua regola
+  (R1: MI < 1 mbit; R2: moduli opzionali risposti da < 15%, se ne tiene una colonna
+  per modulo; R3: domande solo-fisso con risposte senza segnale; R4: STREHAB1, copia
+  di CVDSTRK3 dopo B4). La selezione sostituisce B5 (max_missing_frac=1.0): una
+  colonna scelta resta anche con tanti NaN (es. CVDASPRN); B6 aggiunge comunque gli
+  indicatori. Va confrontata in CV con DEFAULT_CONFIG prima di usarla in run.py.
 - y_train serve perche' keep_informative / missing_indicators scelgono le colonne in
   base alla differenza di prevalenza MICHD tra righe NaN e righe con risposta
   (>= 3 punti, >= 500 righe per lato). Con entrambi a False si puo' passare None.

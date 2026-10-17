@@ -17,6 +17,7 @@ from src.features import (  # noqa: E402
 from src.pipeline import (  # noqa: E402
     DEFAULT_CONFIG,
     V0_CONFIG,
+    V1_CONFIG,
     apply_preprocess,
     fit_preprocess,
 )
@@ -266,6 +267,23 @@ def test_label_leakage_is_dropped_without_domain_drop():
     assert not any(n.startswith("HAREHAB1") for n in out)
 
 
+def test_v1_config_selects_the_features():
+    x, y, names = fake_brfss()
+    seatbelt = 1.0 + np.arange(len(x)) % 5  # 1 always .. 5 never, in NOT_SELECTED
+    x, names = np.column_stack([x, seatbelt]), names + ["SEATBELT"]
+    config = dict(V1_CONFIG, min_missing_rows=5)
+    state = fit_preprocess(x, y, names, config)
+    out = state["out_names"]
+    assert "SEATBELT" not in out
+    # the selection replaces B5: MOSTLY_NAN (90% NaN, not informative, dropped by
+    # DEFAULT_CONFIG) is kept; B6 still adds the missing indicators
+    assert "MOSTLY_NAN" in out and "INSULIN_isnan" in out
+    tx = apply_preprocess(x, names, state)
+    assert tx.shape == (len(x), len(out)) and np.isfinite(tx).all()
+    out = fit_preprocess(x, y, names, dict(config, select_features=False))["out_names"]
+    assert "SEATBELT" in out
+
+
 def test_labels_are_needed_only_for_the_missing_steps():
     x, y, names = fake_brfss()
     with pytest.raises(ValueError):
@@ -326,11 +344,12 @@ def test_expansion_errors():
 
 def test_each_step_can_be_switched_off():
     x, y, names = fake_brfss()
-    base = dict(DEFAULT_CONFIG, min_missing_rows=5)
-    variants = [dict(base, **{key: False}) for key, v in base.items() if v is True]
-    variants += [dict(base, impute="median"), dict(base, max_missing_frac=1.0)]
-    for config in variants:
-        state = fit_preprocess(x, y, names, config)
-        tx = apply_preprocess(x[:50], names, state)
-        assert tx.shape == (50, len(state["out_names"]))
-        assert np.isfinite(tx).all()
+    for full in (DEFAULT_CONFIG, V1_CONFIG):
+        base = dict(full, min_missing_rows=5)
+        variants = [dict(base, **{key: False}) for key, v in base.items() if v is True]
+        variants += [dict(base, impute="median"), dict(base, max_missing_frac=1.0)]
+        for config in variants:
+            state = fit_preprocess(x, y, names, config)
+            tx = apply_preprocess(x[:50], names, state)
+            assert tx.shape == (50, len(state["out_names"]))
+            assert np.isfinite(tx).all()

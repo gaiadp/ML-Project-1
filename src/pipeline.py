@@ -10,6 +10,7 @@ one switched on or off by the config for the ablation:
     B2  domain_drop         drop ids, survey design (DOMAIN_DROP); the label leakage
                             columns (LABEL_LEAKAGE) are dropped also without it
         drop_redundant      drop the duplicates of other columns (REDUNDANT)
+        select_features     drop the columns not chosen from the EDA (NOT_SELECTED)
     B5  max_missing_frac    drop columns with too many NaN ...
         keep_informative    ... except those whose missingness is informative
     B6  missing_indicators  one isnan column per group of informative columns
@@ -44,6 +45,7 @@ from src.feature_types import (
     FEATURE_TYPES,
     LABEL_LEAKAGE,
     NOMINAL,
+    NOT_SELECTED,
     ONE_HOT_ORDINAL,
     REDUNDANT,
 )
@@ -73,6 +75,7 @@ from src.preprocessing import (
 DEFAULT_CONFIG = dict(
     domain_drop=True,  # B2: drop the columns of DOMAIN_DROP
     drop_redundant=True,  # B2: drop the columns of REDUNDANT
+    select_features=False,  # B2: drop the columns of NOT_SELECTED (V1_CONFIG)
     convert_units=True,  # B3
     skip_logic_fill=True,  # B4
     max_missing_frac=0.5,  # B5: drop the columns with a larger fraction of NaN ...
@@ -109,6 +112,13 @@ V0_CONFIG = dict(
     binning=False,
 )
 
+# pipeline v1: the full pipeline on the 124 columns chosen from the EDA (the others are
+# in NOT_SELECTED, src/feature_types.py, with the reason). The selection replaces B5:
+# every selected column is kept, also with many NaN (CVDASPRN, 96% NaN: B5 would drop
+# it, MICHD is the same when missing, but |r| = 0.26 on its answers). B6 still adds
+# the missing indicators.
+V1_CONFIG = dict(DEFAULT_CONFIG, select_features=True, max_missing_frac=1.0)
+
 
 def _clean(x, names, config):
     """B1, B3, B4, B10: the steps without fitted statistics. x is not modified."""
@@ -129,6 +139,8 @@ def _candidate_columns(names, config):
         drop |= set(DOMAIN_DROP)
     if config["drop_redundant"]:
         drop |= set(REDUNDANT)
+    if config["select_features"]:
+        drop |= set(NOT_SELECTED)
     if config["convert_units"]:
         drop |= set(CONVERTED)  # the converted version is kept instead
     return np.array([name not in drop for name in names])

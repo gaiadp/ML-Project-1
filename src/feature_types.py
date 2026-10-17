@@ -10,6 +10,9 @@ how the pipeline encodes a column. Comments mark the codes that need care.
 
 CONVERTED: mixed-units columns that the dataset also provides already converted to
 one unit; the pipeline keeps only the converted column.
+
+NOT_SELECTED: columns left out by the feature selection of V1_CONFIG
+(src/pipeline.py), with the reason, chosen from the EDA tables in build/eda/.
 """
 
 _ID_DATE = "interview id or date"
@@ -541,4 +544,90 @@ CONVERTED = {
     "EXERHMM1": "PADUR1_",  # minutes
     "EXERHMM2": "PADUR2_",
     "STRENGTH": "STRFREQ_",  # times per week
+}
+
+# B2c feature selection (select_features=True, used by V1_CONFIG in src/pipeline.py):
+# column name -> reason it is not used. Chosen from the EDA tables (build/eda/) among
+# the 236 columns left after DOMAIN_DROP, CONVERTED and REDUNDANT: 112 are listed here,
+# 124 are kept. The rules, in this order:
+#  R1 weak signal: mutual information with MICHD < 1 mbit in A6 (target_relation.txt,
+#     NaN counted as a value). For scale: the entropy of the label is 431 mbit, GENHLTH
+#     has 43.6, SEX 3.6. For small effects MI ~ q (1 - q) d^2 / (2 ln2 p (1 - p)) bits,
+#     with q the size of a group, d its difference of MICHD prevalence, p = 8.8%:
+#     1 mbit is a column that splits the people into two halves whose prevalence
+#     differs by ~2 points. 89 columns: the answers of most optional modules, the
+#     data-quality flags, details of the fruit / vegetable / seat belt answers.
+#  R2 optional modules answered by fewer than 15% of the people (NaN > 85% in A6,
+#     after B4): the columns of a module share one NaN mask (A4, missingness.txt), so
+#     most of their MI is who was asked, the same for all of them. Among these columns
+#     we keep one per module, the one with the highest MI (B6 adds its NaN indicator).
+#     Kept: CDASSIST (cognitive decline), DRADVISE (sodium), SCNTPAID (social context),
+#     ARTTODAY (arthritis management), CVDASPRN (aspirin), HADSIGM3 (colorectal cancer
+#     screening); EYEEXAM, SHINGLE2, HPVADVC2, PREGNANT, DIABAGE2 are alone. 19 columns.
+#  R3 landline-sample questions, NaN for the cell-phone interviews (A4: one NaN mask,
+#     42.5% NaN, MICHD 6.2% vs 10.7%). The MI of NUMMEN, NUMHHOL2, MSCODE in A6
+#     (4.5-4.9 mbit) is that mask, which NUMADULT, NUMWOMEN and CPDEMO1 keep; their own
+#     answers carry ~0.3 mbit or less (prevalence by value in overview.txt, |r| <= 0.026
+#     against 0.061-0.068 for the kept ones). 3 columns.
+#  R4 STREHAB1, stroke rehabilitation: 515 answers; B4 fills "no" for everyone without
+#     a stroke, so the column repeats CVDSTRK3 (MI 19.3 vs 19.7). 1 column.
+# The rules look at the labels of the whole training set, as REDUNDANT does: the CV
+# score of V1_CONFIG is slightly optimistic (say it in the report). _FRUITEX and
+# _VEGETEX, kept columns of REDUNDANT, are listed too (R1): their family has no signal.
+_WEAK = "R1: MI < 1 mbit (A6)"
+_MODULE = "R2: optional module answered by < 15%, another column of it is kept"
+_LANDLINE = "R3: landline-sample question, its answers carry no signal (A1, A4)"
+NOT_SELECTED = {
+    # R1, core questionnaire
+    **dict.fromkeys(["MEDCOST", "RENTHOM1", "NUMPHON2", "STOPSMK2"], _WEAK),
+    **dict.fromkeys(["USENOW3", "SEATBELT"], _WEAK),
+    # R1, calculated variables: race, fruit and vegetables, drinking, seat belt,
+    # physical activity, data-quality flags
+    **dict.fromkeys(["_MRACE1", "_FRUTSUM", "_FRTLT1", "_VEGLT1"], _WEAK),
+    **dict.fromkeys(["VEGEDA1_", "ORNGDAY_", "BEANDAY_", "_RFDRHV5"], _WEAK),
+    **dict.fromkeys(["_RFSEAT2", "_RFSEAT3", "PA1VIGM_", "PAVIG21_"], _WEAK),
+    **dict.fromkeys(["PAMISS1_", "_MISFRTN", "_MISVEGN", "_FRUITEX"], _WEAK),
+    **dict.fromkeys(["_VEGETEX"], _WEAK),
+    # R1, optional modules: prediabetes, caregiver
+    **dict.fromkeys(["PDIABTST", "PREDIAB1", "CAREGIV1", "CRGVREL1"], _WEAK),
+    **dict.fromkeys(["CRGVLNG1", "CRGVHRS1", "CRGVPRB1", "CRGVPERS"], _WEAK),
+    **dict.fromkeys(["CRGVHOUS", "CRGVMST2", "CRGVEXPT"], _WEAK),
+    # R1, optional modules: visual impairment
+    **dict.fromkeys(["VIDFCLT2", "VIREDIF3", "VIPRFVS2", "VINOCRE2"], _WEAK),
+    **dict.fromkeys(["VIEYEXM2", "VIINSUR2", "VICTRCT4", "VIGLUMA2"], _WEAK),
+    **dict.fromkeys(["VIMACDG2"], _WEAK),
+    # R1, optional modules: adult asthma history
+    **dict.fromkeys(["ASTHMAGE", "ASATTACK", "ASERVIST", "ASDRVIST"], _WEAK),
+    **dict.fromkeys(["ASRCHKUP", "ASACTLIM", "ASYMPTOM", "ASNOSLEP"], _WEAK),
+    **dict.fromkeys(["ASTHMED3", "ASINHALR"], _WEAK),
+    # R1, optional modules: tetanus and HPV shots
+    **dict.fromkeys(["TETANUS", "HPVADSHT"], _WEAK),
+    # R1, optional modules: breast, cervical, colorectal and prostate cancer screening
+    **dict.fromkeys(["HADMAM", "HOWLONG", "HADPAP2", "LASTPAP2"], _WEAK),
+    **dict.fromkeys(["HPVTEST", "HPLSTTST", "HADHYST2", "PROFEXAM"], _WEAK),
+    **dict.fromkeys(["LENGEXAM", "LSTBLDS3", "PCPSAAD2", "PCPSADI1"], _WEAK),
+    **dict.fromkeys(["PCPSARE1", "PSATEST1", "PSATIME", "PCPSARS1"], _WEAK),
+    **dict.fromkeys(["PCPSADE1", "PCDMDECN"], _WEAK),
+    # R1, optional modules: social context, sexual orientation and gender identity,
+    # emotional support, anxiety and depression
+    **dict.fromkeys(["SCNTMNY1", "SCNTMEL1", "SXORIENT", "TRNSGNDR"], _WEAK),
+    **dict.fromkeys(["EMTSUPRT", "LSATISFY", "ADPLEASR", "ADDOWN"], _WEAK),
+    **dict.fromkeys(["ADSLEEP", "ADENERGY", "ADEAT1", "ADFAIL"], _WEAK),
+    **dict.fromkeys(["ADTHINK", "ADMOVE", "MISTMNT", "ADANXEV"], _WEAK),
+    # R2, cognitive decline: CDASSIST kept (and the gate question CIMEMLOS, 74% NaN)
+    **dict.fromkeys(["CDHOUSE", "CDSOCIAL", "CDDISCUS", "CDHELP"], _MODULE),
+    # R2, sodium: DRADVISE kept (|r| 0.21 with MICHD on its answers)
+    **dict.fromkeys(["WTCHSALT", "LONGWTCH"], _MODULE),
+    # R2, social context: SCNTPAID kept
+    **dict.fromkeys(["SCNTWRK1", "SCNTLPAD", "SCNTLWK1"], _MODULE),
+    # R2, arthritis management: ARTTODAY kept
+    **dict.fromkeys(["ARTHWGT", "ARTHEXER", "ARTHEDU"], _MODULE),
+    # R2, aspirin (cardiovascular health module): CVDASPRN kept (|r| 0.26)
+    **dict.fromkeys(["ASPUNSAF", "RLIVPAIN", "RDUCHART", "RDUCSTRK"], _MODULE),
+    # R2, colorectal cancer screening: HADSIGM3 kept
+    **dict.fromkeys(["BLDSTOOL", "HADSGCO1", "LASTSIG3"], _MODULE),
+    # R3
+    **dict.fromkeys(["NUMMEN", "NUMHHOL2", "MSCODE"], _LANDLINE),
+    # R4
+    "STREHAB1": "R4: after B4 a copy of CVDSTRK3 (515 own answers)",
 }

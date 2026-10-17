@@ -14,6 +14,7 @@ from src.feature_types import (  # noqa: E402
     FEATURE_TYPES,
     LABEL_LEAKAGE,
     MIXED_UNITS,
+    NOT_SELECTED,
     ONE_HOT_ORDINAL,
     ORDINAL,
     REDUNDANT,
@@ -66,3 +67,17 @@ def test_one_hot_and_binned_columns():
     for name, edges in BINNED.items():
         assert FEATURE_TYPES[name] not in (DROP, MIXED_UNITS), name
         assert list(edges) == sorted(set(edges)), name
+
+
+def test_not_selected_columns():
+    """The V1 selection only removes columns that the other lists keep."""
+    for name, reason in NOT_SELECTED.items():
+        assert FEATURE_TYPES[name] != DROP, name
+        assert name not in REDUNDANT and name not in CONVERTED, name
+        assert name not in ONE_HOT_ORDINAL and name not in BINNED, name
+        assert isinstance(reason, str) and reason, name
+    # the numbers given in the comment above NOT_SELECTED
+    candidates = set(FEATURE_TYPES) - set(DOMAIN_DROP) - set(CONVERTED)
+    candidates -= set(REDUNDANT)
+    assert len(candidates) == 236
+    assert len(candidates - set(NOT_SELECTED)) == 124
