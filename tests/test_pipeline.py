@@ -274,6 +274,56 @@ def test_labels_are_needed_only_for_the_missing_steps():
     fit_preprocess(x, None, names, no_labels)
 
 
+def test_expansion_step():
+    x, y, names = fake_brfss()
+    base = dict(DEFAULT_CONFIG, min_missing_rows=5, one_hot_min_rows=5)
+    plain = fit_preprocess(x, y, names, base)
+    config = dict(
+        base,
+        poly_degree=3,
+        interaction_top=3,
+        interaction_pairs=(("WTKG3", "SEX"), ("SEX", "WTKG3")),
+    )
+    state = fit_preprocess(x, y, names, config)
+    out = state["out_names"]
+    n_base = len(plain["out_names"])
+    assert out[:n_base] == plain["out_names"]
+    assert len(out) == len(set(out))
+    # WTKG3 has 30 distinct values: squared and cubed; SEX is binary: no powers
+    assert "WTKG3^2" in out and "WTKG3^3" in out
+    assert not any(n.startswith("SEX^") for n in out)
+    # 3 pairs of the top 3, plus WTKG3 * SEX given twice (in either order)
+    products = [n for n in out if "*" in n]
+    pair = [n for n in products if set(n.split("*")) == {"WTKG3", "SEX"}]
+    assert len(products) in (3, 4) and len(pair) == 1
+
+    tx = apply_preprocess(x, names, state)
+    assert tx.shape == (len(x), len(out))
+    np.testing.assert_allclose(tx[:, :n_base], apply_preprocess(x, names, plain))
+    np.testing.assert_allclose(tx[:, 1:].mean(axis=0), 0.0, atol=1e-10)
+    # a product is the standardized product of the two standardized columns
+    i, j, k = out.index("WTKG3"), out.index("SEX"), out.index(pair[0])
+    p = tx[:, i] * tx[:, j]
+    np.testing.assert_allclose(tx[:, k], (p - p.mean()) / p.std(), atol=1e-10)
+    # test rows use the training statistics
+    tx_test = apply_preprocess(np.full((2, len(names)), np.nan), names, state)
+    assert tx_test.shape == (2, len(out)) and np.isfinite(tx_test).all()
+
+
+def test_expansion_errors():
+    x, y, names = fake_brfss()
+    no_labels = dict(
+        DEFAULT_CONFIG, keep_informative=False, missing_indicators=False
+    )
+    with pytest.raises(ValueError):
+        fit_preprocess(x, None, names, dict(no_labels, interaction_top=2))
+    with pytest.raises(ValueError):
+        fit_preprocess(x, y, names, dict(no_labels, interaction_pairs=(("A", "B"),)))
+    # a config without the B11 keys (saved before they existed) still works
+    old = {k: v for k, v in no_labels.items() if not k.startswith(("poly", "inter"))}
+    assert fit_preprocess(x, None, names, old)["pairs"] == []
+
+
 def test_each_step_can_be_switched_off():
     x, y, names = fake_brfss()
     base = dict(DEFAULT_CONFIG, min_missing_rows=5)

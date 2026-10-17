@@ -76,7 +76,7 @@ def main():
         f"+ {len(state['ind_cols'])} missing indicators, tx {tx_tr.shape}"
     )
 
-    w, loss = fit(METHOD, y_tr, tx_tr, lambda_=LAMBDA)
+    w, loss = fit(METHOD, y_tr, tx_tr, lambda_=LAMBDA, seed=SEED)
     print(f"{METHOD} (lambda={LAMBDA}): training loss {loss:.4f}")
 
     scores_tr = predict_scores(METHOD, w, tx_tr)

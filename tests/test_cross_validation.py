@@ -64,6 +64,22 @@ def test_cross_validate_sgd_is_reproducible():
     np.testing.assert_array_equal(a["oof_scores"], b["oof_scores"])
 
 
+def test_cross_validate_grid_matches_cross_validate():
+    x, y, names = fake_brfss()
+    config = dict(CONFIG, poly_degree=2, interaction_top=3)
+    for method, grid in [
+        ("ridge_regression", [dict(lambda_=1e-3), dict(lambda_=1e-1)]),  # SVD
+        ("least_squares", [{}]),
+        ("mean_squared_error_sgd", [dict(gamma=0.01, max_iters=50)]),
+    ]:
+        outs = cv.cross_validate_grid(x, y, names, config, method, grid, k_fold=4)
+        assert len(outs) == len(grid)
+        for params, out in zip(grid, outs):
+            one = cv.cross_validate(x, y, names, config, method, k_fold=4, **params)
+            np.testing.assert_allclose(out["oof_scores"], one["oof_scores"], atol=1e-8)
+            np.testing.assert_array_equal(out["f1"], one["f1"])
+
+
 def test_cross_validation_ridge_matches_ridge_regression(monkeypatch):
     x, y, names = fake_brfss()
     lambdas = np.array([1e-4, 1e-2, 1.0])

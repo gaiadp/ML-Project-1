@@ -89,26 +89,58 @@ def cross_validate(x, y, names, config, method, k_fold=5, seed=1, **fit_kwargs):
         folds); per fold (shape=(k_fold,)): f1, f1_val_best, threshold, n_features;
         and oof_scores, shape=(N,): validation score of each row (out of fold)
     """
+    return cross_validate_grid(x, y, names, config, method, [fit_kwargs], k_fold, seed)[0]
+
+
+def cross_validate_grid(x, y, names, config, method, grid, k_fold=5, seed=1):
+    """cross_validate for several sets of fit parameters on the same folds.
+
+    Each fold is preprocessed once and reused for every entry of the grid. For
+    ridge_regression with a grid of lambdas > 0 only, the weights of all the lambdas
+    come from a single SVD per fold (ridge_weights_svd).
+
+    Args:
+        x, y, names, config, method, k_fold, seed: as cross_validate
+        grid: list of dicts of fit parameters (lambda_, gamma, max_iters, ...)
+
+    Returns:
+        list of dicts as cross_validate returns, one per entry of grid
+    """
     y = np.asarray(y)
     k_indices = stratified_k_indices(y, k_fold, seed)
-    out = {key: np.zeros(k_fold) for key in ("f1", "f1_val_best", "threshold")}
-    out["n_features"] = np.zeros(k_fold, dtype=int)
-    out["oof_scores"] = np.full(len(y), np.nan)
+    outs = []
+    for _ in grid:
+        out = {key: np.zeros(k_fold) for key in ("f1", "f1_val_best", "threshold")}
+        out["n_features"] = np.zeros(k_fold, dtype=int)
+        out["oof_scores"] = np.full(len(y), np.nan)
+        outs.append(out)
+    # lambda = 0 would divide by a zero singular value: solved by least_squares
+    svd_lambdas = None
+    if method == "ridge_regression" and all(set(p) <= {"lambda_"} for p in grid):
+        lambdas = np.array([p.get("lambda_", 0.0) for p in grid], dtype=float)
+        svd_lambdas = lambdas if np.all(lambdas > 0) else None
+
     for k in range(k_fold):
         train_idx, val_idx = _fold(k_indices, k)
         tx_tr, tx_va, _ = _preprocess_fold(x, y, names, config, train_idx, val_idx)
-        w, _ = fit(method, y[train_idx], tx_tr, seed=seed, **fit_kwargs)
-        threshold, _ = best_threshold(predict_scores(method, w, tx_tr), y[train_idx])
-        del tx_tr
-        scores = predict_scores(method, w, tx_va)
-        out["threshold"][k] = threshold
-        out["f1"][k] = f1_score(y[val_idx], predict_labels(scores, threshold))
-        out["f1_val_best"][k] = best_threshold(scores, y[val_idx])[1]
-        out["n_features"][k] = tx_va.shape[1]
-        out["oof_scores"][val_idx] = scores
-    out["f1_mean"] = float(out["f1"].mean())
-    out["f1_std"] = float(out["f1"].std())
-    return out
+        y_tr = y[train_idx]
+        if svd_lambdas is not None:
+            weights = ridge_weights_svd(y_tr.astype(float), tx_tr, svd_lambdas)
+        else:
+            weights = [fit(method, y_tr, tx_tr, seed=seed, **p)[0] for p in grid]
+        for out, w in zip(outs, weights):
+            threshold, _ = best_threshold(predict_scores(method, w, tx_tr), y_tr)
+            scores = predict_scores(method, w, tx_va)
+            out["threshold"][k] = threshold
+            out["f1"][k] = f1_score(y[val_idx], predict_labels(scores, threshold))
+            out["f1_val_best"][k] = best_threshold(scores, y[val_idx])[1]
+            out["n_features"][k] = tx_va.shape[1]
+            out["oof_scores"][val_idx] = scores
+        del tx_tr, tx_va
+    for out in outs:
+        out["f1_mean"] = float(out["f1"].mean())
+        out["f1_std"] = float(out["f1"].std())
+    return outs
 
 
 def cross_validation_ridge(x, y, names, config, lambdas, k_fold=5, seed=1):
