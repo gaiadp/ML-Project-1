@@ -18,6 +18,24 @@ The extra methods of `src/extra_implementations` (`reg_logistic_adaptive_gd`,
 (phases 02 / 03 are the same as there), and the trees build interactions by themselves.
 The trees run on pipeline v1 only, since they are slow (minutes per fit).
 
+## One-off runs outside the phases
+
+A grid that is not one of the phases (e.g. a finer lambda grid, more trees) goes to
+`results/<method>/extra/<name>.json`: give `run_grid` a phase name starting with
+`extra/`, so the files read by the next phases and by `baselines.py`
+(`results/<method>/0*.json`) do not change:
+
+```bash
+python -c "
+import runpy
+from experiments.common import param_grid, run_grid
+s = runpy.run_path('experiments/logistic_boosting/01_baseline.py')
+run_grid(s['METHOD'], 'extra/01_more_trees', {'v1': s['V1_CONFIG']},
+         param_grid(lambda_=[1e-4], max_iters=[20], n_trees=[400], max_depth=[3, 4],
+                    learning_rate=[0.05]), 5, 1)
+"
+```
+
 ## Baseline table
 
 `baselines.py` puts phase 01 of every method in one table (best F1 per pipeline, best

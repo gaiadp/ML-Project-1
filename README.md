@@ -14,6 +14,12 @@ Competition: https://www.aicrowd.com/challenges/epfl-machine-learning-project-1
   signatures — they are imported directly by the auto-grader.
 - `run.py` must reproduce the `.csv` of our best AIcrowd submission.
 
+## Environment
+
+Python 3.9 with the versions of the graders' environment, pinned in
+[requirements.txt](requirements.txt): `pip install -r requirements.txt`, or the conda
+environment of the course (`grading_tests/environment.yml`, which has the same versions).
+
 ## Repository structure
 
 ```
@@ -37,8 +43,9 @@ experiments/          # Scripts producing the results discussed in the report
                          # hyperparameter grid), 02 degree, 03 interactions, 04 final
   baselines.py           # Table of all the methods vs trivial rules, from results/
   ablation.py             # Ablation study
-results/               # JSON of every phase (results/<method>/<phase>.json) and tables
-notebooks/            # Scratch/exploration notebooks (not graded, keep experiments/ authoritative)
+results/               # JSON of every phase (results/<method>/<phase>.json) and tables;
+                         # one-off runs outside the phases in results/<method>/extra/
+USAGE_NOTES.md         # Pitfalls of the data and of the code (Italian)
 tests/                 # Our sanity tests (official grading_tests run separately, see below)
 report/                # LaTeX report (2 pages + 1 page references, from the course template)
   figures/               # Figures exported from experiments/, referenced by report.tex

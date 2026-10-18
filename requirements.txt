@@ -1,6 +1,13 @@
-# Only allowed libraries per the project rules: numpy, standard lib, and
-# matplotlib/seaborn for visualization only (no pandas, sklearn, torch, ...).
-numpy
-matplotlib
-seaborn
-pytest
+# Versions of the conda environment of the graders (project1-grading, from
+# grading_tests/environment.yml of the course repository): Python 3.9.
+# Only allowed libraries per the project rules: NumPy and the standard library,
+# matplotlib / seaborn for the plots only (no pandas, scikit-learn, torch, ...).
+numpy==1.23.1
+matplotlib==3.5.2
+seaborn==0.11.2
+# development: our tests (pytest tests/) and the formatting check (black --check .)
+pytest==7.1.2
+black==22.6.0
+# needed only by the official grading tests (their conftest.py imports git)
+pytest-mock==3.7.0
+gitpython==3.1.18
