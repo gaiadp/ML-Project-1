@@ -5,7 +5,7 @@ run_final (phase 4). Every phase writes results/<method>/<phase>.json; the next 
 reads its best row with load_best, so the numbers never have to be copied by hand.
 
 Phases (one folder per method of implementations.py, same files in each):
-    01_baseline.py      pipeline v0 / full, no expansion
+    01_baseline.py      pipeline v0 / full / v1 (EDA feature selection), no expansion
     02_degree.py        polynomial degree, on the best pipeline of 01
     03_interactions.py  number of interaction columns, on the best pipeline of 02
     04_final.py         CV of the best setting, fit on the full training set,
@@ -57,7 +57,9 @@ def load_result(method, phase):
     """The JSON written by run_grid / run_final for this method and phase."""
     path = result_path(method, phase)
     if not os.path.exists(path):
-        raise FileNotFoundError(f"{path} not found: run experiments/{method}/{phase}.py")
+        raise FileNotFoundError(
+            f"{path} not found: run experiments/{method}/{phase}.py"
+        )
     with open(path) as f:
         return json.load(f)
 

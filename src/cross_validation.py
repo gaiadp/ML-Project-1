@@ -89,7 +89,9 @@ def cross_validate(x, y, names, config, method, k_fold=5, seed=1, **fit_kwargs):
         folds); per fold (shape=(k_fold,)): f1, f1_val_best, threshold, n_features;
         and oof_scores, shape=(N,): validation score of each row (out of fold)
     """
-    return cross_validate_grid(x, y, names, config, method, [fit_kwargs], k_fold, seed)[0]
+    return cross_validate_grid(x, y, names, config, method, [fit_kwargs], k_fold, seed)[
+        0
+    ]
 
 
 def cross_validate_grid(x, y, names, config, method, grid, k_fold=5, seed=1):

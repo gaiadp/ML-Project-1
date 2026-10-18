@@ -330,9 +330,7 @@ def test_expansion_step():
 
 def test_expansion_errors():
     x, y, names = fake_brfss()
-    no_labels = dict(
-        DEFAULT_CONFIG, keep_informative=False, missing_indicators=False
-    )
+    no_labels = dict(DEFAULT_CONFIG, keep_informative=False, missing_indicators=False)
     with pytest.raises(ValueError):
         fit_preprocess(x, None, names, dict(no_labels, interaction_top=2))
     with pytest.raises(ValueError):

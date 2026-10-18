@@ -1,4 +1,4 @@
-"""Phase 1, ridge_regression: pipeline v0 vs full pipeline, no expansion.
+"""Phase 1, ridge_regression: pipelines v0, full and v1, no expansion.
 
 Writes results/ridge_regression/01_baseline.json.
 
@@ -15,11 +15,11 @@ if ROOT not in sys.path:
 import numpy as np  # noqa: E402
 
 from experiments.common import param_grid, run_grid  # noqa: E402
-from src.pipeline import DEFAULT_CONFIG, V0_CONFIG  # noqa: E402
+from src.pipeline import DEFAULT_CONFIG, V0_CONFIG, V1_CONFIG  # noqa: E402
 
 # ---- settings of the experiment ----
 METHOD = "ridge_regression"
-PIPELINES = {"v0": V0_CONFIG, "full": DEFAULT_CONFIG}
+PIPELINES = {"v0": V0_CONFIG, "full": DEFAULT_CONFIG, "v1": V1_CONFIG}
 # one SVD per fold for the whole lambda grid
 FIT_GRID = param_grid(lambda_=np.logspace(-7, -1, 7))
 K_FOLD = 5

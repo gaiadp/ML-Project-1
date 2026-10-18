@@ -28,9 +28,7 @@ SEED = 1  # folds, SGD and undersampling: same value in every phase
 
 
 def main():
-    run_final(
-        METHOD, FROM_PHASE, PIPELINE_OVERRIDES, FIT_OVERRIDES, K_FOLD, SEED
-    )
+    run_final(METHOD, FROM_PHASE, PIPELINE_OVERRIDES, FIT_OVERRIDES, K_FOLD, SEED)
 
 
 if __name__ == "__main__":

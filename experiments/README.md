@@ -4,7 +4,7 @@ One folder per method of `implementations.py`, with the same four phases in each
 
 | Script | What it does | Reads | Writes |
 |---|---|---|---|
-| `01_baseline.py` | pipeline v0 vs full pipeline, no expansion | – | `results/<method>/01_baseline.json` |
+| `01_baseline.py` | pipeline v0 vs full pipeline vs v1 (full + feature selection from the EDA, `V1_CONFIG`), no expansion | – | `results/<method>/01_baseline.json` |
 | `02_degree.py` | polynomial degree (`poly_degree`) | best of 01 | `results/<method>/02_degree.json` |
 | `03_interactions.py` | interaction columns (`interaction_top`, `interaction_pairs`) | best of 02 | `results/<method>/03_interactions.json` |
 | `04_final.py` | CV of the best setting, threshold on the out-of-fold scores, fit on all the training set | best of 03 (`FROM_PHASE`) | `results/<method>/04_final.json`, `submissions/<method>.csv` |
