@@ -18,6 +18,22 @@ The extra methods of `src/extra_implementations` (`reg_logistic_adaptive_gd`,
 (phases 02 / 03 are the same as there), and the trees build interactions by themselves.
 The trees run on pipeline v1 only, since they are slow (minutes per fit).
 
+## Baseline table
+
+`baselines.py` puts phase 01 of every method in one table (best F1 per pipeline, best
+setting), next to trivial rules computed on the same folds (everyone MICHD, best rule
+on the age group, on age group x sex, on GENHLTH). There is no separate tuning script:
+the hyperparameters are the grids of the phases, the threshold is chosen in every fold.
+
+```bash
+python experiments/baselines.py            # from results/*/01_baseline.json (seconds)
+python experiments/baselines.py --rerun    # run phase 01 of every method again first (hours)
+python experiments/baselines.py --rerun ridge_regression least_squares   # only some methods
+```
+
+It writes `results/baselines.md` and `results/baselines.tex` (a LaTeX tabular for the
+report). `--rerun` runs the `01_baseline.py` scripts as they are (all their pipelines).
+
 ## Changing an experiment
 
 Every script starts with a settings block, the only part to edit:

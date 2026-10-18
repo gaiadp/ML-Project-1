@@ -33,13 +33,28 @@ src/                  # Our own reusable pipeline code
   plots.py                # Shared plotting helpers
 experiments/          # Scripts producing the results discussed in the report
   eda.py                # Exploratory data analysis
-  baselines.py           # CV comparison of the 6 base methods
-  tuning.py               # Hyperparameter search
+  common.py, <method>/  # Per-method phases: 01 baseline (pipelines v0 / full / v1,
+                         # hyperparameter grid), 02 degree, 03 interactions, 04 final
+  baselines.py           # Table of all the methods vs trivial rules, from results/
   ablation.py             # Ablation study
+results/               # JSON of every phase (results/<method>/<phase>.json) and tables
 notebooks/            # Scratch/exploration notebooks (not graded, keep experiments/ authoritative)
 tests/                 # Our sanity tests (official grading_tests run separately, see below)
 report/                # LaTeX report (2 pages + 1 page references, from the course template)
   figures/               # Figures exported from experiments/, referenced by report.tex
 dataset/               # x_train.csv, y_train.csv, x_test.csv (gitignored)
 submissions/           # Generated prediction .csv files (gitignored)
+```
+
+## Baseline comparison
+
+The hyperparameters are tuned inside the phases (grids of `experiments/<method>/0*.py`,
+decision threshold chosen in every CV fold). The comparison table of all the methods
+(5-fold CV, same folds) against trivial rules, written to `results/baselines.md` and
+`results/baselines.tex`:
+
+```bash
+python experiments/baselines.py            # reads results/*/01_baseline.json (seconds)
+python experiments/baselines.py --rerun    # first runs phase 01 of every method again (hours)
+python experiments/baselines.py --rerun ridge_regression least_squares   # only some methods
 ```
