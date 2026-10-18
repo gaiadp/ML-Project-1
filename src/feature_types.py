@@ -574,6 +574,9 @@ CONVERTED = {
 # The rules look at the labels of the whole training set, as REDUNDANT does: the CV
 # score of V1_CONFIG is slightly optimistic (say it in the report). _FRUITEX and
 # _VEGETEX, kept columns of REDUNDANT, are listed too (R1): their family has no signal.
+# every reason starts with its rule, "R1:" .. "R4:"; select_features can apply only
+# some rules (for the ablation, experiments/ablation.py)
+SELECTION_RULES = ("R1", "R2", "R3", "R4")
 _WEAK = "R1: MI < 1 mbit (A6)"
 _MODULE = "R2: optional module answered by < 15%, another column of it is kept"
 _LANDLINE = "R3: landline-sample question, its answers carry no signal (A1, A4)"

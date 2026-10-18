@@ -284,6 +284,22 @@ def test_v1_config_selects_the_features():
     assert "SEATBELT" in out
 
 
+def test_select_features_by_rule():
+    x, y, names = fake_brfss()
+    # SEATBELT is left out by rule R1, CDHOUSE by rule R2
+    extra = np.column_stack([1.0 + np.arange(len(x)) % 5, 1.0 + np.arange(len(x)) % 4])
+    x, names = np.column_stack([x, extra]), names + ["SEATBELT", "CDHOUSE"]
+    config = dict(V1_CONFIG, min_missing_rows=5)
+    out = fit_preprocess(x, y, names, config)["out_names"]
+    assert "SEATBELT" not in out and "CDHOUSE" not in out
+    # without rule R1: SEATBELT comes back, CDHOUSE stays out
+    config = dict(config, select_features=("R2", "R3", "R4"))
+    out = fit_preprocess(x, y, names, config)["out_names"]
+    assert "SEATBELT" in out and "CDHOUSE" not in out
+    with pytest.raises(ValueError):
+        fit_preprocess(x, y, names, dict(config, select_features=("R9",)))
+
+
 def test_labels_are_needed_only_for_the_missing_steps():
     x, y, names = fake_brfss()
     with pytest.raises(ValueError):

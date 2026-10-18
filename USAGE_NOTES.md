@@ -146,7 +146,10 @@ state["out_names"]                       # nomi delle colonne di tx ("bias" prim
   colonna per modulo; R3: domande solo-fisso con risposte senza segnale; R4: `STREHAB1`,
   copia di `CVDSTRK3` dopo B4). La selezione sostituisce B5 (`max_missing_frac=1.0`): una
   colonna scelta resta anche con tanti NaN (es. `CVDASPRN`); B6 aggiunge comunque gli
-  indicatori. Va confrontata in CV con `DEFAULT_CONFIG` prima di usarla in `run.py`.
+  indicatori. In CV dà lo stesso F1 di `DEFAULT_CONFIG` con il 20% di colonne in meno.
+  `select_features` accetta anche l'elenco delle regole da applicare, per esempio
+  `("R1", "R2", "R4")` per togliere solo la R3 (`not_selected` in `src/pipeline.py`):
+  lo usa l'ablation.
 - `y_train` serve perché `keep_informative` / `missing_indicators` scelgono le colonne in
   base alla differenza di prevalenza MICHD tra righe NaN e righe con risposta (≥ 3 punti,
   ≥ 500 righe per lato). Con entrambi a `False` si può passare `None`.
@@ -283,7 +286,9 @@ state["out_names"]                       # nomi delle colonne di tx ("bias" prim
   - `f1` (con media `f1_mean` e deviazione standard `f1_std` sui fold) è il numero da
     riportare; `f1_val_best` (soglia scelta sulla validazione stessa) è ottimista come il
     singolo split di `run.py`.
-  - Per l'ablation: stessa chiamata con `dict(DEFAULT_CONFIG, flag=False)`.
+  - `f1_default`: F1 con la soglia naturale del metodo (0.5 per le probabilità, 0 per i
+    metodi lineari), senza ottimizzarla: è la riga "soglia 0.5" dell'ablation.
+  - Ablation: `experiments/ablation.py` (spiegata in `experiments/README.md`).
 - `run.py` deve riprodurre **esattamente** la nostra migliore submission: fissare i seed e
   usare lo stesso preprocessing (con statistiche fittate sul training completo).
 - Gli `Id` della submission sono quelli di `x_test` (`test_ids` di `load_csv_data`), nello

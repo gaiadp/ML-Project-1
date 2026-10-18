@@ -9,7 +9,7 @@ mean / std) never see the validation part, as on the real test set.
 import numpy as np
 
 from src.metrics import best_threshold, f1_score, predict_labels
-from src.models import fit, predict_scores
+from src.models import default_threshold, fit, predict_scores
 from src.pipeline import apply_preprocess, fit_preprocess
 
 
@@ -73,7 +73,9 @@ def cross_validate(x, y, names, config, method, k_fold=5, seed=1, **fit_kwargs):
     choose the decision threshold that maximizes F1 on the TRAINING scores, and
     measure F1 on the validation part with that threshold. f1_val_best (threshold
     chosen on the validation part itself) is optimistic, as the single-split
-    number of run.py: report f1, compare with f1_val_best.
+    number of run.py: report f1, compare with f1_val_best. f1_default uses the
+    natural threshold of the method (0.5 for probabilities, 0 for the linear
+    methods): the F1 without the threshold tuning, for the ablation.
 
     Args:
         x: raw data, shape=(N, D) (Id column removed)
@@ -86,7 +88,8 @@ def cross_validate(x, y, names, config, method, k_fold=5, seed=1, **fit_kwargs):
 
     Returns:
         dict with f1_mean, f1_std (mean and standard deviation of f1 over the
-        folds); per fold (shape=(k_fold,)): f1, f1_val_best, threshold, n_features;
+        folds); per fold (shape=(k_fold,)): f1, f1_val_best, f1_default, threshold,
+        n_features;
         and oof_scores, shape=(N,): validation score of each row (out of fold)
     """
     return cross_validate_grid(x, y, names, config, method, [fit_kwargs], k_fold, seed)[
@@ -112,7 +115,8 @@ def cross_validate_grid(x, y, names, config, method, grid, k_fold=5, seed=1):
     k_indices = stratified_k_indices(y, k_fold, seed)
     outs = []
     for _ in grid:
-        out = {key: np.zeros(k_fold) for key in ("f1", "f1_val_best", "threshold")}
+        keys = ("f1", "f1_val_best", "f1_default", "threshold")
+        out = {key: np.zeros(k_fold) for key in keys}
         out["n_features"] = np.zeros(k_fold, dtype=int)
         out["oof_scores"] = np.full(len(y), np.nan)
         outs.append(out)
@@ -136,6 +140,8 @@ def cross_validate_grid(x, y, names, config, method, grid, k_fold=5, seed=1):
             out["threshold"][k] = threshold
             out["f1"][k] = f1_score(y[val_idx], predict_labels(scores, threshold))
             out["f1_val_best"][k] = best_threshold(scores, y[val_idx])[1]
+            default = predict_labels(scores, default_threshold(method))
+            out["f1_default"][k] = f1_score(y[val_idx], default)
             out["n_features"][k] = tx_va.shape[1]
             out["oof_scores"][val_idx] = scores
         del tx_tr, tx_va

@@ -43,7 +43,7 @@ experiments/          # Scripts producing the results discussed in the report
                          # hyperparameter grid), 02 degree, 03 interactions, 04 final
   run_phases.py          # Runs the phases of a method in order, skipping those done
   baselines.py           # Table of all the methods vs trivial rules, from results/
-  ablation.py             # Ablation study
+  ablation.py            # Ablation study: pipeline steps (Newton) and model components
 results/               # JSON of every phase (results/<method>/<phase>.json) and tables;
                          # one-off runs outside the phases in results/<method>/extra/
 USAGE_NOTES.md         # Pitfalls of the data and of the code (Italian)

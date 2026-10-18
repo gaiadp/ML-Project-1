@@ -20,13 +20,14 @@ METHOD = "logistic_boosting"
 # trees are slow: v1 only, the best pipeline of reg_logistic_newton
 PIPELINES = {"v1": V1_CONFIG}
 # lambda_, max_iters: the logistic part (best Newton setting of 01_baseline);
-# the trees only correct it, so few shallow trees with a small learning rate.
-# ~1 h in all (Newton ~20 s + ~1 s per tree per fit, 5 folds)
+# the trees only correct it: shallow trees, small learning rate. The first grid
+# (n_trees 100 / 200, depth 2 / 3, Oct 18) had its best at its edge (200, 3):
+# extended to more and deeper trees. ~2-2.5 h in all (5 folds)
 FIT_GRID = param_grid(
     lambda_=[1e-4],
     max_iters=[20],
-    n_trees=[100, 200],
-    max_depth=[2, 3],
+    n_trees=[200, 400],
+    max_depth=[3, 4],
     learning_rate=[0.05],
 )
 K_FOLD = 5

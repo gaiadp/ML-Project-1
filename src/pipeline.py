@@ -10,7 +10,8 @@ one switched on or off by the config for the ablation:
     B2  domain_drop         drop ids, survey design (DOMAIN_DROP); the label leakage
                             columns (LABEL_LEAKAGE) are dropped also without it
         drop_redundant      drop the duplicates of other columns (REDUNDANT)
-        select_features     drop the columns not chosen from the EDA (NOT_SELECTED)
+        select_features     drop the columns not chosen from the EDA (NOT_SELECTED):
+                            True = all its rules, or a tuple of rules ("R1", ...)
     B5  max_missing_frac    drop columns with too many NaN ...
         keep_informative    ... except those whose missingness is informative
     B6  missing_indicators  one isnan column per group of informative columns
@@ -46,6 +47,7 @@ from src.feature_types import (
     LABEL_LEAKAGE,
     NOMINAL,
     NOT_SELECTED,
+    SELECTION_RULES,
     ONE_HOT_ORDINAL,
     REDUNDANT,
 )
@@ -75,7 +77,9 @@ from src.preprocessing import (
 DEFAULT_CONFIG = dict(
     domain_drop=True,  # B2: drop the columns of DOMAIN_DROP
     drop_redundant=True,  # B2: drop the columns of REDUNDANT
-    select_features=False,  # B2: drop the columns of NOT_SELECTED (V1_CONFIG)
+    # B2: drop the columns of NOT_SELECTED (V1_CONFIG): True = all the rules R1-R4,
+    # or a tuple of the rules to apply, e.g. ("R1", "R2", "R4")
+    select_features=False,
     convert_units=True,  # B3
     skip_logic_fill=True,  # B4
     max_missing_frac=0.5,  # B5: drop the columns with a larger fraction of NaN ...
@@ -132,6 +136,26 @@ def _clean(x, names, config):
     return x
 
 
+def not_selected(rules=True):
+    """Columns left out by the feature selection (NOT_SELECTED) under some rules.
+
+    Args:
+        rules: True for all the rules (SELECTION_RULES), or a collection of rule
+            names, e.g. ("R1", "R2"); every reason in NOT_SELECTED starts with
+            its rule, "R1:" .. "R4:"
+
+    Returns:
+        list of column names
+    """
+    rules = SELECTION_RULES if rules is True else tuple(rules)
+    unknown = sorted(set(rules) - set(SELECTION_RULES))
+    if unknown:
+        raise ValueError(
+            f"unknown selection rules {unknown}, expected {SELECTION_RULES}"
+        )
+    return [name for name, reason in NOT_SELECTED.items() if reason[:2] in rules]
+
+
 def _candidate_columns(names, config):
     """B2, B3: bool mask of the columns that can be features (fixed lists)."""
     drop = set(LABEL_LEAKAGE)  # with any config
@@ -140,7 +164,7 @@ def _candidate_columns(names, config):
     if config["drop_redundant"]:
         drop |= set(REDUNDANT)
     if config["select_features"]:
-        drop |= set(NOT_SELECTED)
+        drop |= set(not_selected(config["select_features"]))
     if config["convert_units"]:
         drop |= set(CONVERTED)  # the converted version is kept instead
     return np.array([name not in drop for name in names])

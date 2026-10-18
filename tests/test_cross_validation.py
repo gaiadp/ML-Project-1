@@ -99,3 +99,19 @@ def test_cross_validation_ridge_matches_ridge_regression(monkeypatch):
         np.testing.assert_allclose(w, ridge_regression(y_tr, tx_tr, lam)[0], atol=1e-8)
     assert out["best_lambda"] in lambdas
     assert out["val_f1"].shape == out["val_loss"].shape == (3,)
+
+
+def test_f1_default_uses_the_natural_threshold():
+    x, y, names = fake_brfss()
+    k_fold = 4
+    folds = cv.stratified_k_indices(y, k_fold, seed=1)
+    for method, params, threshold in [
+        ("reg_logistic_newton", dict(lambda_=1e-2, max_iters=10), 0.5),
+        ("ridge_regression", dict(lambda_=1e-2), 0.0),
+    ]:
+        out = cv.cross_validate(x, y, names, CONFIG, method, k_fold, seed=1, **params)
+        expected = [
+            cv.f1_score(y[f], cv.predict_labels(out["oof_scores"][f], threshold))
+            for f in folds
+        ]
+        np.testing.assert_allclose(out["f1_default"], expected)

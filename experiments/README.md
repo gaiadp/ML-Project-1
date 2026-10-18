@@ -7,11 +7,13 @@ Scripts that produce the results of the report. Contents:
 3. [Running the chain of phases: `run_phases.py`](#running-the-chain-of-phases-run_phasespy)
 4. [One-off runs outside the phases](#one-off-runs-outside-the-phases)
 5. [Baseline table: `baselines.py`](#baseline-table-baselinespy)
-6. [Notes](#notes)
+6. [Ablation study: `ablation.py`](#ablation-study-ablationpy)
+7. [Notes](#notes)
 
 Other scripts: `eda.py` (exploratory data analysis, tables in `build/eda/`),
 `imbalance.py` (class imbalance: threshold vs class weights vs undersampling),
-`ablation.py` (ablation study).
+`smoke_test.py` (~30 s check on 20k real rows before a long run: every pipeline
+variant of the ablation and the final models train and predict; writes nothing).
 
 ## Phases of a method
 
@@ -273,11 +275,53 @@ python experiments/baselines.py --rerun ridge_regression least_squares   # only 
 It writes `results/baselines.md` and `results/baselines.tex` (a LaTeX tabular for the
 report). `--rerun` runs the `01_baseline.py` scripts as they are (all their pipelines).
 
+## Ablation study: `ablation.py`
+
+How much every choice contributes to the final model: starting from the final model,
+one thing is removed at a time, on the same folds as all the other experiments. Two
+tables:
+
+| Table | What is removed | Model | Hyperparameters |
+|---|---|---|---|
+| Data preparation | one pipeline step at a time: each rule R1–R4 of the feature selection, the whole selection, the selection replaced by the NaN rule B5 (= full pipeline), domain drop, duplicate drop, unit conversion, skip-logic fill, missing indicators, one-hot, one-hot of the ordinals, binning, imputation by type | Newton (`reg_logistic_newton`) | lambda searched again for every variant (`DATA_LAMBDAS`) |
+| Model | the trees on the residuals; then also Newton's exact minimum (plain GD); the tuned threshold (0.5 instead) | the final model (`logistic_boosting`) | fixed, those of the final model |
+
+Why two models: removing columns can move the best lambda, so it is searched again
+for every pipeline variant, which is affordable with Newton (~20 s per fit) and not
+with the hybrid (~16 min per CV). The hybrid is Newton plus a small correction by
+trees, so the steps of the pipeline weigh the same on both. In the model table the
+removed components already had their hyperparameters chosen in CV.
+
+The final model is read from `results/<FINAL_METHOD>/04_final.json`: the pipeline and
+the hyperparameters that phase 04 used for the submission, `FIT_OVERRIDES` /
+`PIPELINE_OVERRIDES` included. So **run phase 04 first** (`run_phases.py <method>`);
+without it the ablation stops and says so. The ablation does not change the model: it
+measures what every part of it is worth, for the report. The other settings are the
+block at the top of the script.
+Every row gives the mean F1, the difference from the final row and in how many
+folds the variant is better (paired on the same folds).
+
+```bash
+python experiments/ablation.py                # missing parts, then the tables
+python experiments/ablation.py --parts data   # only the data-preparation table (~1 h)
+python experiments/ablation.py --parts model  # only the model table (~10 min: the final
+                                              # row is reused from the CV of phase 04)
+python experiments/ablation.py --force        # compute everything again
+```
+
+The CV results go to `results/reg_logistic_newton/ablation_data.json`,
+`results/logistic_boosting/ablation_model.json`,
+`results/reg_logistic_regression/ablation_model.json`; a part whose results exist is
+not computed again (use `--force` after changing the final model or the settings).
+The tables go to `results/ablation.md` and `results/ablation.tex` (LaTeX tabular).
+
 ## Notes
 
 - F1 is measured on the validation part of each fold with the threshold chosen on the
   training part (`src/cross_validation.py`); `val-best` in the tables is the optimistic
   F1 with the threshold chosen on the validation part itself. Report `f1_mean`.
+  `f1_default` is the F1 with the natural threshold of the method (0.5 for
+  probabilities, 0 for the linear methods), without tuning: used by the ablation.
 - The polynomial and interaction columns are pipeline step B11 (`src/pipeline.py`):
   they are fitted inside each fold, and the interaction columns chosen by
   `interaction_top` use the labels of the training part only.

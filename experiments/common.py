@@ -189,6 +189,9 @@ def _row(label, config, params, out, seconds):
         f1_std=out["f1_std"],
         f1_folds=out["f1"],
         f1_val_best=float(np.mean(out["f1_val_best"])),
+        # F1 with the natural threshold of the method (0.5 / 0), no tuning
+        f1_default=float(np.mean(out["f1_default"])),
+        f1_default_folds=out["f1_default"],
         threshold=float(np.mean(out["threshold"])),
         n_features=int(out["n_features"][0]),
         finite=bool(np.isfinite(out["oof_scores"]).all()),
