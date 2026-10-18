@@ -1,0 +1,138 @@
+{
+  "method": "reg_logistic_adaptive_gd",
+  "phase": "01_baseline",
+  "date": "2026-10-18 15:15",
+  "k_fold": 5,
+  "seed": 1,
+  "rows": [
+    {
+      "label": "v1",
+      "pipeline": {
+        "domain_drop": true,
+        "drop_redundant": true,
+        "select_features": true,
+        "convert_units": true,
+        "skip_logic_fill": true,
+        "max_missing_frac": 1.0,
+        "keep_informative": true,
+        "missing_indicators": true,
+        "min_missing_diff": 0.03,
+        "min_missing_rows": 500,
+        "impute": "by_type",
+        "recode_binary": true,
+        "one_hot": true,
+        "one_hot_min_rows": 500,
+        "one_hot_ordinal": true,
+        "binning": true,
+        "poly_degree": 1,
+        "interaction_top": 0,
+        "interaction_pairs": []
+      },
+      "fit": {
+        "lambda_": 0.0001,
+        "gamma": 1.0,
+        "max_iters": 100
+      },
+      "f1_mean": 0.43145894120146105,
+      "f1_std": 0.0013825175232130543,
+      "f1_folds": [
+        0.4329755964180737,
+        0.4323527346766833,
+        0.42980136939868485,
+        0.4297735513443251,
+        0.4323914541695382
+      ],
+      "f1_val_best": 0.433171546991702,
+      "threshold": 0.20249291204433995,
+      "n_features": 334,
+      "finite": true,
+      "seconds": 231.05234467983246
+    },
+    {
+      "label": "v1",
+      "pipeline": {
+        "domain_drop": true,
+        "drop_redundant": true,
+        "select_features": true,
+        "convert_units": true,
+        "skip_logic_fill": true,
+        "max_missing_frac": 1.0,
+        "keep_informative": true,
+        "missing_indicators": true,
+        "min_missing_diff": 0.03,
+        "min_missing_rows": 500,
+        "impute": "by_type",
+        "recode_binary": true,
+        "one_hot": true,
+        "one_hot_min_rows": 500,
+        "one_hot_ordinal": true,
+        "binning": true,
+        "poly_degree": 1,
+        "interaction_top": 0,
+        "interaction_pairs": []
+      },
+      "fit": {
+        "lambda_": 0.0001,
+        "gamma": 1.0,
+        "max_iters": 300
+      },
+      "f1_mean": 0.4322166260859803,
+      "f1_std": 0.0018911294777899984,
+      "f1_folds": [
+        0.434082708853733,
+        0.433300876338851,
+        0.43005216448750083,
+        0.4297951072431988,
+        0.4338522735066182
+      ],
+      "f1_val_best": 0.43296019306363265,
+      "threshold": 0.202599626901747,
+      "n_features": 334,
+      "finite": true,
+      "seconds": 231.05234467983246
+    }
+  ],
+  "best": {
+    "label": "v1",
+    "pipeline": {
+      "domain_drop": true,
+      "drop_redundant": true,
+      "select_features": true,
+      "convert_units": true,
+      "skip_logic_fill": true,
+      "max_missing_frac": 1.0,
+      "keep_informative": true,
+      "missing_indicators": true,
+      "min_missing_diff": 0.03,
+      "min_missing_rows": 500,
+      "impute": "by_type",
+      "recode_binary": true,
+      "one_hot": true,
+      "one_hot_min_rows": 500,
+      "one_hot_ordinal": true,
+      "binning": true,
+      "poly_degree": 1,
+      "interaction_top": 0,
+      "interaction_pairs": []
+    },
+    "fit": {
+      "lambda_": 0.0001,
+      "gamma": 1.0,
+      "max_iters": 300
+    },
+    "f1_mean": 0.4322166260859803,
+    "f1_std": 0.0018911294777899984,
+    "f1_folds": [
+      0.434082708853733,
+      0.433300876338851,
+      0.43005216448750083,
+      0.4297951072431988,
+      0.4338522735066182
+    ],
+    "f1_val_best": 0.43296019306363265,
+    "threshold": 0.202599626901747,
+    "n_features": 334,
+    "finite": true,
+    "seconds": 231.05234467983246
+  }
+}

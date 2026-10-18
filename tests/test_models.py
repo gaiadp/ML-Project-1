@@ -9,9 +9,13 @@ import pytest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import implementations as impl  # noqa: E402
+from src.extra_implementations import reg_logistic_newton  # noqa: E402
 from src.models import (  # noqa: E402
+    EXTRA_METHODS,
+    LOGISTIC_OPTIMIZERS,
     METHODS,
     class_weights,
+    default_threshold,
     fit,
     predict,
     predict_scores,
@@ -174,3 +178,41 @@ def test_unknown_method_raises(data):
         fit("lasso", y, tx)
     with pytest.raises(ValueError):
         predict_scores("lasso", np.zeros(D), tx)
+
+
+# small trees for the fake data (extra options of fit)
+TREE_OPTIONS = dict(n_trees=10, max_depth=4, min_samples_leaf=5)
+
+
+@pytest.mark.parametrize("method", EXTRA_METHODS)
+def test_extra_methods_classify_separable_data(method, data):
+    y, tx = data
+    options = {} if method in LOGISTIC_OPTIMIZERS else TREE_OPTIONS
+    w, loss = fit(method, y, tx, lambda_=1e-4, max_iters=300, seed=1, **options)
+    scores = predict_scores(method, w, tx)
+    labels = predict(method, w, tx)
+    assert scores.shape == (N,) and np.all((scores >= 0) & (scores <= 1))
+    assert set(np.unique(labels)) <= {-1, 1} and np.ndim(loss) == 0
+    assert np.mean(labels == y) > 0.9
+    assert default_threshold(method) == 0.5
+    if method in LOGISTIC_OPTIMIZERS:
+        assert w.shape == (D,)
+
+
+def test_fit_extra_optimizer_uses_01_labels(data):
+    y, tx = data
+    w, loss = fit("reg_logistic_newton", y, tx, lambda_=0.1, max_iters=20)
+    w_ref, loss_ref = reg_logistic_newton(to_01(y), tx, 0.1, np.zeros(D), 20)
+    np.testing.assert_array_equal(w, w_ref)
+    assert loss == loss_ref
+
+
+def test_options_only_for_extra_methods(data):
+    y, tx = data
+    with pytest.raises(ValueError):
+        fit("ridge_regression", y, tx, n_trees=10)
+    # an option of another extra method: rejected by the method itself
+    with pytest.raises(TypeError):
+        fit("reg_logistic_sophia", y, tx, n_trees=10)
+    with pytest.raises(ValueError):
+        fit("random_forest", y, tx, pos_weight=2.0, **TREE_OPTIONS)

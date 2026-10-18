@@ -77,7 +77,7 @@ def run_grid(method, phase, pipelines, fit_grid, k_fold=5, seed=1):
     results/<method>/<phase>.json.
 
     Args:
-        method: one of src.models.METHODS
+        method: one of src.models.ALL_METHODS
         phase: name of the phase, also the name of the JSON file
         pipelines: dict label -> full preprocessing config
         fit_grid: list of dicts of fit parameters (param_grid)
@@ -125,7 +125,7 @@ def run_final(
     then refitted on the whole training set and predicts x_test.
 
     Args:
-        method: one of src.models.METHODS
+        method: one of src.models.ALL_METHODS
         from_phase: phase whose best row is used (e.g. "03_interactions")
         pipeline_overrides, fit_overrides: dicts that change the best setting
         k_fold, seed: as run_grid

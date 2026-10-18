@@ -23,7 +23,11 @@ run.py                # Reproduces our best submission end-to-end -> submissions
 src/                  # Our own reusable pipeline code
   preprocessing.py     # Cleaning, missing values, standardization
   features.py           # Feature engineering (encoding, polynomial expansion, ...)
-  models.py             # Our extensions of the 6 base methods
+  models.py             # Common fit / predict interface: 6 base methods + extra methods
+  extra_implementations/ # Extra methods, NumPy only: adaptive GD, Newton, Sophia,
+                         # UniXGrad (same loss as reg_logistic_regression),
+                         # random forest and gradient boosting (histogram trees),
+                         # logistic regression + boosted trees on its residuals
   cross_validation.py   # Train/val split, k-fold CV, grid search
   metrics.py             # Accuracy, F1, confusion matrix, ...
   plots.py                # Shared plotting helpers

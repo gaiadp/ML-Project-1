@@ -12,6 +12,7 @@ Note per il gruppo: cose non ovvie da tenere a mente quando si usano le funzioni
 5. [Espansioni di feature](#5-espansioni-di-feature)
 6. [I 6 metodi](#6-i-6-metodi)
 7. [Valutazione e submission](#7-valutazione-e-submission)
+8. [Metodi extra](#8-metodi-extra)
 
 ---
 
@@ -287,3 +288,46 @@ state["out_names"]                       # nomi delle colonne di tx ("bias" prim
   usare lo stesso preprocessing (con statistiche fittate sul training completo).
 - Gli `Id` della submission sono quelli di `x_test` (`test_ids` di `load_csv_data`), nello
   stesso ordine delle predizioni.
+
+---
+
+## 8. Metodi extra
+
+`src/extra_implementations/` (solo NumPy), usati con `fit` / `predict_scores` / `predict` di
+`src/models.py` come i 6 metodi (`ALL_METHODS` = `METHODS` + `EXTRA_METHODS`).
+
+- **4 ottimizzatori della stessa loss** di `reg_logistic_regression` (logistica media +
+  `lambda_ * ||w||^2`, penalità anche sul bias): `reg_logistic_adaptive_gd` (passo di
+  Barzilai-Borwein + backtracking), `reg_logistic_newton` (IRLS), `reg_logistic_sophia`
+  (minibatch, diagonale dell'Hessiana, passo clippato), `reg_logistic_unixgrad`
+  (extra-gradient con passo adattivo).
+  - A convergenza danno **lo stesso `w`** di `reg_logistic_regression` con abbastanza
+    iterazioni: l'F1 cambia solo se il GD a passo fisso non era convergente. Il guadagno è
+    in velocità e nel non dover scegliere `gamma`.
+  - Significato dei parametri di `fit`: `gamma` = primo passo di prova per l'adaptive GD,
+    passo massimo per coordinata per Sophia, ignorato da Newton e UniXGrad.
+  - Parametri propri, passati a `fit` come argomenti in più (`**options`): Sophia
+    `batch_size`, `beta1`, `beta2`, `rho`, `hess_every`; UniXGrad `radius` (deve contenere
+    l'ottimo: se troppo piccolo, il risultato è l'ottimo vincolato alla palla); Newton `tol`.
+- **2 ensemble di alberi**: `random_forest` e `gradient_boosting` (alberi a istogrammi, 32
+  bin per colonna ai quantili del training).
+  - `fit` restituisce un **dict** (bordi dei bin + alberi), non un vettore: non fare
+    `tx @ w`, usare sempre `predict_scores`. Gli score sono probabilità (soglia 0.5).
+  - Parametri propri: `n_trees`, `max_depth`, `min_samples_leaf`, `subsample`, `n_bins`;
+    RF anche `max_features` (default `sqrt(D)`); boosting `learning_rate`, `reg_lambda`,
+    `colsample`. `lambda_`, `gamma`, `max_iters`, `initial_w` sono ignorati.
+  - Non serve standardizzare (conta solo l'ordine dei valori), ma l'output della pipeline
+    va bene così com'è. Le potenze / interazioni di B11 non servono: gli alberi le
+    costruiscono da soli.
+  - Lenti: ~3 min per fit (RF, 100 alberi) e ~6 min (boosting, 200 alberi) su un fold
+    di CV, quindi decine di minuti per riga di griglia.
+- **Ibrido `logistic_boosting`**: logistica regolarizzata (Newton, `lambda_`, `max_iters`,
+  `initial_w`) e poi gradient boosting **sui suoi residui**: gli alberi partono dal margine
+  `tx @ w` invece che dalla prevalenza, quindi imparano solo quello che il modello lineare non
+  vede (interazioni, effetti curvi). Con `n_trees=0` è esattamente la logistica di Newton.
+  Parametri degli alberi come per `gradient_boosting` (default `learning_rate=0.05`,
+  `max_depth=3`, `n_trees=100`); `fit` restituisce un dict (`w` + alberi).
+- Con i metodi base, un parametro di `**options` dà `ValueError`; un parametro sbagliato per
+  un metodo extra dà `TypeError`. `pos_weight` resta solo per le 2 logistiche base.
+- Esperimenti: `experiments/<metodo>/01_baseline.py` e `04_final.py` per ogni metodo extra
+  (stessi fold e seed degli altri metodi).

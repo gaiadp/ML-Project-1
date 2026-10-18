@@ -80,7 +80,7 @@ def cross_validate(x, y, names, config, method, k_fold=5, seed=1, **fit_kwargs):
         y: labels in {-1, 1}, shape=(N,)
         names: the D column names
         config: preprocessing config (src/pipeline.py)
-        method: one of src.models.METHODS
+        method: one of src.models.ALL_METHODS
         k_fold, seed: folds and their seed, also the seed of mean_squared_error_sgd
         **fit_kwargs: lambda_, gamma, max_iters, ... for src.models.fit
 

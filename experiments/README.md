@@ -11,6 +11,13 @@ One folder per method of `implementations.py`, with the same four phases in each
 
 Run them in order, with the Run button or `python experiments/<method>/<phase>.py`.
 
+The extra methods of `src/extra_implementations` (`reg_logistic_adaptive_gd`,
+`reg_logistic_newton`, `reg_logistic_sophia`, `reg_logistic_unixgrad`, `random_forest`,
+`gradient_boosting`, `logistic_boosting`) have only `01_baseline.py` and `04_final.py` (`FROM_PHASE =
+"01_baseline"`): the four optimizers minimize the same loss as `reg_logistic_regression`
+(phases 02 / 03 are the same as there), and the trees build interactions by themselves.
+The trees run on pipeline v1 only, since they are slow (minutes per fit).
+
 ## Changing an experiment
 
 Every script starts with a settings block, the only part to edit:

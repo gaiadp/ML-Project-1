@@ -1,9 +1,10 @@
 """Our own extensions of the basic methods in implementations.py.
 
-fit / predict_scores / predict give the same interface to the 6 methods, with labels
-always in {-1, 1} outside this module. Class imbalance (8.8% positives) is handled by
-two options of fit: class weights in the logistic loss (pos_weight) and undersampling
-of the negatives (neg_per_pos); the decision threshold is chosen outside, on the scores
+fit / predict_scores / predict give the same interface to the 6 methods and to the
+extra methods of src/extra_implementations, with labels always in {-1, 1} outside
+this module. Class imbalance (8.8% positives) is handled by two options of fit: class
+weights in the logistic loss (pos_weight) and undersampling of the negatives
+(neg_per_pos); the decision threshold is chosen outside, on the scores
 (src.metrics.best_threshold).
 """
 
@@ -18,8 +19,21 @@ from implementations import (
     ridge_regression,
     sigmoid,
 )
+from src.extra_implementations import (
+    gradient_boosting,
+    gradient_boosting_predict_proba,
+    logistic_boosting,
+    logistic_boosting_predict_proba,
+    random_forest,
+    random_forest_predict_proba,
+    reg_logistic_adaptive_gd,
+    reg_logistic_newton,
+    reg_logistic_sophia,
+    reg_logistic_unixgrad,
+)
 from src.metrics import predict_labels
 
+# the 6 methods of implementations.py
 METHODS = (
     "mean_squared_error_gd",
     "mean_squared_error_sgd",
@@ -29,6 +43,20 @@ METHODS = (
     "reg_logistic_regression",
 )
 LOGISTIC_METHODS = ("logistic_regression", "reg_logistic_regression")
+# src/extra_implementations: optimizers of the reg_logistic_regression objective (a
+# weight vector w, scores sigmoid(tx @ w)) and tree models (a model dict): two tree
+# ensembles and the hybrid logistic regression + boosted trees
+LOGISTIC_OPTIMIZERS = (
+    "reg_logistic_adaptive_gd",
+    "reg_logistic_newton",
+    "reg_logistic_sophia",
+    "reg_logistic_unixgrad",
+)
+TREE_METHODS = ("random_forest", "gradient_boosting", "logistic_boosting")
+EXTRA_METHODS = LOGISTIC_OPTIMIZERS + TREE_METHODS
+ALL_METHODS = METHODS + EXTRA_METHODS
+# methods whose scores are probabilities (natural threshold 0.5)
+PROBABILITY_METHODS = LOGISTIC_METHODS + EXTRA_METHODS
 
 
 def to_01(y):
@@ -147,30 +175,41 @@ def fit(
     seed=None,
     pos_weight=None,
     neg_per_pos=None,
+    **options,
 ):
-    """Train one of the 6 methods of implementations.py.
+    """Train one of the 6 methods of implementations.py or an extra method.
 
-    Parameters a method does not use are ignored (e.g. lambda_ for least_squares).
+    Parameters a method does not use are ignored (e.g. lambda_ for least_squares,
+    gamma for reg_logistic_newton / reg_logistic_unixgrad / logistic_boosting,
+    lambda_, max_iters and initial_w for random_forest / gradient_boosting).
 
     Args:
-        method: name of the method, one of METHODS
+        method: name of the method, one of ALL_METHODS
         y: labels in {-1, 1}, shape=(N,)
         tx: feature matrix, shape=(N, D)
-        lambda_: regularization parameter (ridge_regression, reg_logistic_regression)
-        gamma: step size (iterative methods)
-        max_iters: number of steps (iterative methods)
+        lambda_: regularization parameter (ridge_regression, reg_logistic_regression,
+            its optimizers and the logistic part of logistic_boosting)
+        gamma: step size (iterative methods); first trial step of
+            reg_logistic_adaptive_gd
+        max_iters: number of steps (iterative methods; Newton steps of
+            logistic_boosting)
         initial_w: initial weights, shape=(D,); zeros if None
-        seed: seed of np.random before mean_squared_error_sgd and of the
-            undersampling; None leaves them random
+        seed: seed of np.random before mean_squared_error_sgd, of the undersampling,
+            of the minibatches of Sophia and of the trees; None leaves them random
         pos_weight: logistic methods only, weight of the positive samples in the
             loss (weighted_logistic_regression); None = unweighted
         neg_per_pos: if given, train on all the positives and neg_per_pos random
             negatives per positive (undersample_indices); None = all the rows
+        **options: extra methods only, their own parameters (e.g. batch_size, rho
+            for Sophia, radius for UniXGrad, n_trees, max_depth for the trees: see
+            src/extra_implementations)
 
     Returns:
-        w: trained weights, shape=(D,)
+        w: trained weights, shape=(D,); for the trees, the model dict
         loss: training loss returned by the method (on the rows used for training)
     """
+    if options and method not in EXTRA_METHODS:
+        raise ValueError(f"{method!r} takes no extra options, got {sorted(options)}")
     if initial_w is None:
         initial_w = np.zeros(tx.shape[1])
     if neg_per_pos is not None:
@@ -202,31 +241,66 @@ def fit(
         return reg_logistic_regression(
             to_01(y), tx, lambda_, initial_w, max_iters, gamma
         )
-    raise ValueError(f"Unknown method {method!r}, expected one of {METHODS}")
+    if method in EXTRA_METHODS:
+        return _fit_extra(
+            method, to_01(y), tx, lambda_, gamma, max_iters, initial_w, seed, options
+        )
+    raise ValueError(f"Unknown method {method!r}, expected one of {ALL_METHODS}")
+
+
+def _fit_extra(method, y01, tx, lambda_, gamma, max_iters, initial_w, seed, options):
+    """fit for the methods of src/extra_implementations (labels in {0, 1})."""
+    if method == "reg_logistic_adaptive_gd":
+        return reg_logistic_adaptive_gd(
+            y01, tx, lambda_, initial_w, max_iters, gamma, **options
+        )
+    if method == "reg_logistic_newton":
+        return reg_logistic_newton(y01, tx, lambda_, initial_w, max_iters, **options)
+    if method == "reg_logistic_sophia":
+        return reg_logistic_sophia(
+            y01, tx, lambda_, initial_w, max_iters, gamma, seed=seed, **options
+        )
+    if method == "reg_logistic_unixgrad":
+        return reg_logistic_unixgrad(y01, tx, lambda_, initial_w, max_iters, **options)
+    if method == "random_forest":
+        return random_forest(y01, tx, seed=seed, **options)
+    if method == "logistic_boosting":
+        return logistic_boosting(
+            y01, tx, lambda_, initial_w, max_iters, seed=seed, **options
+        )
+    return gradient_boosting(y01, tx, seed=seed, **options)
 
 
 def predict_scores(method, w, tx):
     """Continuous scores, higher = more likely MICHD.
 
-    Probabilities sigma(tx @ w) for the logistic methods, tx @ w for the others.
+    Probabilities sigma(tx @ w) for the logistic methods and the optimizers of
+    src/extra_implementations, the predicted probability for the trees, tx @ w for
+    the others.
 
     Args:
         method: name of the method used to train w
-        w: weights, shape=(D,)
+        w: weights, shape=(D,); for the trees, the model dict returned by fit
         tx: feature matrix, shape=(N, D)
 
     Returns:
         scores: shape=(N,)
     """
-    if method not in METHODS:
-        raise ValueError(f"Unknown method {method!r}, expected one of {METHODS}")
+    if method not in ALL_METHODS:
+        raise ValueError(f"Unknown method {method!r}, expected one of {ALL_METHODS}")
+    if method == "random_forest":
+        return random_forest_predict_proba(w, tx)
+    if method == "gradient_boosting":
+        return gradient_boosting_predict_proba(w, tx)
+    if method == "logistic_boosting":
+        return logistic_boosting_predict_proba(w, tx)
     z = tx @ w
-    return sigmoid(z) if method in LOGISTIC_METHODS else z
+    return sigmoid(z) if method in PROBABILITY_METHODS else z
 
 
 def default_threshold(method):
     """Natural threshold on the scores: 0.5 for probabilities, 0 for labels in {-1, 1}."""
-    return 0.5 if method in LOGISTIC_METHODS else 0.0
+    return 0.5 if method in PROBABILITY_METHODS else 0.0
 
 
 def predict(method, w, tx, threshold=None):
@@ -234,7 +308,7 @@ def predict(method, w, tx, threshold=None):
 
     Args:
         method: name of the method used to train w
-        w: weights, shape=(D,)
+        w: weights, shape=(D,); for the trees, the model dict returned by fit
         tx: feature matrix, shape=(N, D)
         threshold: decision threshold on the scores; default_threshold(method) if None
 

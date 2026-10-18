@@ -1,0 +1,42 @@
+"""Phase 1, logistic_boosting: logistic regression + boosted trees on its residuals.
+
+Writes results/logistic_boosting/01_baseline.json.
+
+Run with the Run button on this file, or:  python experiments/logistic_boosting/01_baseline.py
+"""
+
+import os
+import sys
+
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+if ROOT not in sys.path:
+    sys.path.insert(0, ROOT)
+
+from experiments.common import param_grid, run_grid  # noqa: E402
+from src.pipeline import V1_CONFIG  # noqa: E402
+
+# ---- settings of the experiment ----
+METHOD = "logistic_boosting"
+# trees are slow: v1 only, the best pipeline of reg_logistic_newton
+PIPELINES = {"v1": V1_CONFIG}
+# lambda_, max_iters: the logistic part (best Newton setting of 01_baseline);
+# the trees only correct it, so few shallow trees with a small learning rate.
+# ~1 h in all (Newton ~20 s + ~1 s per tree per fit, 5 folds)
+FIT_GRID = param_grid(
+    lambda_=[1e-4],
+    max_iters=[20],
+    n_trees=[100, 200],
+    max_depth=[2, 3],
+    learning_rate=[0.05],
+)
+K_FOLD = 5
+SEED = 1  # folds, SGD and undersampling: same value in every phase
+# -------------------------------------
+
+
+def main():
+    run_grid(METHOD, "01_baseline", PIPELINES, FIT_GRID, K_FOLD, SEED)
+
+
+if __name__ == "__main__":
+    main()

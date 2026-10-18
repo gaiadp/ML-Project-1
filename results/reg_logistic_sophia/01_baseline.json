@@ -1,0 +1,141 @@
+{
+  "method": "reg_logistic_sophia",
+  "phase": "01_baseline",
+  "date": "2026-10-18 15:18",
+  "k_fold": 5,
+  "seed": 1,
+  "rows": [
+    {
+      "label": "v1",
+      "pipeline": {
+        "domain_drop": true,
+        "drop_redundant": true,
+        "select_features": true,
+        "convert_units": true,
+        "skip_logic_fill": true,
+        "max_missing_frac": 1.0,
+        "keep_informative": true,
+        "missing_indicators": true,
+        "min_missing_diff": 0.03,
+        "min_missing_rows": 500,
+        "impute": "by_type",
+        "recode_binary": true,
+        "one_hot": true,
+        "one_hot_min_rows": 500,
+        "one_hot_ordinal": true,
+        "binning": true,
+        "poly_degree": 1,
+        "interaction_top": 0,
+        "interaction_pairs": []
+      },
+      "fit": {
+        "lambda_": 0.0001,
+        "gamma": 0.02,
+        "max_iters": 3000,
+        "batch_size": 2048
+      },
+      "f1_mean": 0.3927570482284559,
+      "f1_std": 0.00497339024499029,
+      "f1_folds": [
+        0.3959976909755628,
+        0.3935615218221148,
+        0.383147853736089,
+        0.39707336365434054,
+        0.39400481095417256
+      ],
+      "f1_val_best": 0.3943647489370845,
+      "threshold": 0.1878511169777432,
+      "n_features": 334,
+      "finite": true,
+      "seconds": 66.40238332748413
+    },
+    {
+      "label": "v1",
+      "pipeline": {
+        "domain_drop": true,
+        "drop_redundant": true,
+        "select_features": true,
+        "convert_units": true,
+        "skip_logic_fill": true,
+        "max_missing_frac": 1.0,
+        "keep_informative": true,
+        "missing_indicators": true,
+        "min_missing_diff": 0.03,
+        "min_missing_rows": 500,
+        "impute": "by_type",
+        "recode_binary": true,
+        "one_hot": true,
+        "one_hot_min_rows": 500,
+        "one_hot_ordinal": true,
+        "binning": true,
+        "poly_degree": 1,
+        "interaction_top": 0,
+        "interaction_pairs": []
+      },
+      "fit": {
+        "lambda_": 0.0001,
+        "gamma": 0.05,
+        "max_iters": 3000,
+        "batch_size": 2048
+      },
+      "f1_mean": 0.3435732938799406,
+      "f1_std": 0.00995861515996448,
+      "f1_folds": [
+        0.35082837991652965,
+        0.3479954756817896,
+        0.3400673400673401,
+        0.3257398876759008,
+        0.3532353860581432
+      ],
+      "f1_val_best": 0.34475486496312835,
+      "threshold": 0.16561081357250917,
+      "n_features": 334,
+      "finite": true,
+      "seconds": 66.40238332748413
+    }
+  ],
+  "best": {
+    "label": "v1",
+    "pipeline": {
+      "domain_drop": true,
+      "drop_redundant": true,
+      "select_features": true,
+      "convert_units": true,
+      "skip_logic_fill": true,
+      "max_missing_frac": 1.0,
+      "keep_informative": true,
+      "missing_indicators": true,
+      "min_missing_diff": 0.03,
+      "min_missing_rows": 500,
+      "impute": "by_type",
+      "recode_binary": true,
+      "one_hot": true,
+      "one_hot_min_rows": 500,
+      "one_hot_ordinal": true,
+      "binning": true,
+      "poly_degree": 1,
+      "interaction_top": 0,
+      "interaction_pairs": []
+    },
+    "fit": {
+      "lambda_": 0.0001,
+      "gamma": 0.02,
+      "max_iters": 3000,
+      "batch_size": 2048
+    },
+    "f1_mean": 0.3927570482284559,
+    "f1_std": 0.00497339024499029,
+    "f1_folds": [
+      0.3959976909755628,
+      0.3935615218221148,
+      0.383147853736089,
+      0.39707336365434054,
+      0.39400481095417256
+    ],
+    "f1_val_best": 0.3943647489370845,
+    "threshold": 0.1878511169777432,
+    "n_features": 334,
+    "finite": true,
+    "seconds": 66.40238332748413
+  }
+}
