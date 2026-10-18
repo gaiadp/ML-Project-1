@@ -41,6 +41,7 @@ experiments/          # Scripts producing the results discussed in the report
   eda.py                # Exploratory data analysis
   common.py, <method>/  # Per-method phases: 01 baseline (pipelines v0 / full / v1,
                          # hyperparameter grid), 02 degree, 03 interactions, 04 final
+  run_phases.py          # Runs the phases of a method in order, skipping those done
   baselines.py           # Table of all the methods vs trivial rules, from results/
   ablation.py             # Ablation study
 results/               # JSON of every phase (results/<method>/<phase>.json) and tables;
@@ -51,6 +52,20 @@ report/                # LaTeX report (2 pages + 1 page references, from the cou
   figures/               # Figures exported from experiments/, referenced by report.tex
 dataset/               # x_train.csv, y_train.csv, x_test.csv (gitignored)
 submissions/           # Generated prediction .csv files (gitignored)
+```
+
+## Running the experiments
+
+Each method has its phases in `experiments/<method>/` (01 baseline, 02 degree,
+03 interactions, 04 final model and `submissions/<method>.csv`), every phase starting
+from the best result of the previous one. To run them in order, skipping the phases
+whose result is already in `results/` (details and the JSON config file in
+[experiments/README.md](experiments/README.md)):
+
+```bash
+python experiments/run_phases.py <method> --dry-run   # plan only
+python experiments/run_phases.py <method>             # missing phases
+python experiments/run_phases.py <method> --force     # all the phases again
 ```
 
 ## Baseline comparison

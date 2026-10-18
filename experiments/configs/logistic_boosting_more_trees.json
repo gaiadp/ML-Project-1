@@ -1,0 +1,6 @@
+{
+  "01_baseline": {
+    "FIT_GRID": {"lambda_": [1e-4], "max_iters": [20], "n_trees": [400],
+                 "max_depth": [3, 4], "learning_rate": [0.05]}
+  }
+}

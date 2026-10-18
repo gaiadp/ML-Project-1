@@ -1,0 +1,6 @@
+{
+  "03_interactions": {
+    "INTERACTION_TOP": [0, 10],
+    "INTERACTION_PAIRS": [["_AGE80", "SEX"], ["_AGE80", "_BMI5"]]
+  }
+}

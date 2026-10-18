@@ -1,0 +1,6 @@
+{
+  "02_degree": {
+    "DEGREES": [1, 2],
+    "FIT_GRID": {"lambda_": [1e-5, 1e-4, 1e-3]}
+  }
+}
