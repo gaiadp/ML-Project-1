@@ -1,0 +1,24 @@
+\begin{tabular}{lccc}
+\hline
+Method & v0 & full & v1 \\
+\hline
+everyone MICHD & \multicolumn{3}{c}{0.162} \\
+age group & \multicolumn{3}{c}{0.274} \\
+age group x sex & \multicolumn{3}{c}{0.294} \\
+general health & \multicolumn{3}{c}{0.309} \\
+\hline
+mean\_squared\_error\_gd & 0.4184 & 0.4205 & 0.4211 \\
+mean\_squared\_error\_sgd & 0.3996 & 0.4039 & 0.4084 \\
+least\_squares & 0.4179 & 0.4209 & 0.4212 \\
+ridge\_regression & 0.4181 & 0.4211 & 0.4216 \\
+logistic\_regression & 0.4270 & 0.4312 & 0.4311 \\
+reg\_logistic\_regression & 0.4270 & 0.4313 & 0.4308 \\
+reg\_logistic\_adaptive\_gd & -- & -- & 0.4322 \\
+reg\_logistic\_newton & -- & -- & 0.4323 \\
+reg\_logistic\_sophia & -- & -- & 0.3928 \\
+reg\_logistic\_unixgrad & -- & -- & 0.4318 \\
+random\_forest & -- & -- & 0.4158 \\
+gradient\_boosting & -- & -- & 0.4298 \\
+logistic\_boosting & -- & -- & 0.4338 \\
+\hline
+\end{tabular}

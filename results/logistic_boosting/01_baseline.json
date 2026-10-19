@@ -1,145 +1,10 @@
 {
   "method": "logistic_boosting",
   "phase": "01_baseline",
-  "date": "2026-10-18 19:46",
+  "date": "2026-10-19 02:52",
   "k_fold": 5,
   "seed": 1,
   "rows": [
-    {
-      "label": "v1",
-      "pipeline": {
-        "domain_drop": true,
-        "drop_redundant": true,
-        "select_features": true,
-        "convert_units": true,
-        "skip_logic_fill": true,
-        "max_missing_frac": 1.0,
-        "keep_informative": true,
-        "missing_indicators": true,
-        "min_missing_diff": 0.03,
-        "min_missing_rows": 500,
-        "impute": "by_type",
-        "recode_binary": true,
-        "one_hot": true,
-        "one_hot_min_rows": 500,
-        "one_hot_ordinal": true,
-        "binning": true,
-        "poly_degree": 1,
-        "interaction_top": 0,
-        "interaction_pairs": []
-      },
-      "fit": {
-        "lambda_": 0.0001,
-        "max_iters": 20,
-        "n_trees": 100,
-        "max_depth": 2,
-        "learning_rate": 0.05
-      },
-      "f1_mean": 0.43262292837335387,
-      "f1_std": 0.002516969091922684,
-      "f1_folds": [
-        0.4361731458505652,
-        0.4335674157303371,
-        0.4299582041256573,
-        0.4295394827824644,
-        0.43387639337774553
-      ],
-      "f1_val_best": 0.433342398556546,
-      "threshold": 0.20063036145849944,
-      "n_features": 334,
-      "finite": true,
-      "seconds": 975.7518264055252
-    },
-    {
-      "label": "v1",
-      "pipeline": {
-        "domain_drop": true,
-        "drop_redundant": true,
-        "select_features": true,
-        "convert_units": true,
-        "skip_logic_fill": true,
-        "max_missing_frac": 1.0,
-        "keep_informative": true,
-        "missing_indicators": true,
-        "min_missing_diff": 0.03,
-        "min_missing_rows": 500,
-        "impute": "by_type",
-        "recode_binary": true,
-        "one_hot": true,
-        "one_hot_min_rows": 500,
-        "one_hot_ordinal": true,
-        "binning": true,
-        "poly_degree": 1,
-        "interaction_top": 0,
-        "interaction_pairs": []
-      },
-      "fit": {
-        "lambda_": 0.0001,
-        "max_iters": 20,
-        "n_trees": 100,
-        "max_depth": 3,
-        "learning_rate": 0.05
-      },
-      "f1_mean": 0.4326973538065295,
-      "f1_std": 0.0023950722487279382,
-      "f1_folds": [
-        0.43557863096051375,
-        0.4332935644606639,
-        0.4301223981744001,
-        0.42969785779080316,
-        0.43479431764626675
-      ],
-      "f1_val_best": 0.43378585060852376,
-      "threshold": 0.20413836493777388,
-      "n_features": 334,
-      "finite": true,
-      "seconds": 975.7518264055252
-    },
-    {
-      "label": "v1",
-      "pipeline": {
-        "domain_drop": true,
-        "drop_redundant": true,
-        "select_features": true,
-        "convert_units": true,
-        "skip_logic_fill": true,
-        "max_missing_frac": 1.0,
-        "keep_informative": true,
-        "missing_indicators": true,
-        "min_missing_diff": 0.03,
-        "min_missing_rows": 500,
-        "impute": "by_type",
-        "recode_binary": true,
-        "one_hot": true,
-        "one_hot_min_rows": 500,
-        "one_hot_ordinal": true,
-        "binning": true,
-        "poly_degree": 1,
-        "interaction_top": 0,
-        "interaction_pairs": []
-      },
-      "fit": {
-        "lambda_": 0.0001,
-        "max_iters": 20,
-        "n_trees": 200,
-        "max_depth": 2,
-        "learning_rate": 0.05
-      },
-      "f1_mean": 0.432681096318114,
-      "f1_std": 0.0022193197913968456,
-      "f1_folds": [
-        0.4351864688756412,
-        0.43412033511043413,
-        0.43056031822234414,
-        0.42951998893346244,
-        0.4340183704486883
-      ],
-      "f1_val_best": 0.43375225264162587,
-      "threshold": 0.2019274638444582,
-      "n_features": 334,
-      "finite": true,
-      "seconds": 975.7518264055252
-    },
     {
       "label": "v1",
       "pipeline": {
@@ -180,10 +45,177 @@
         0.4358252947481243
       ],
       "f1_val_best": 0.4344228605777811,
+      "f1_default": 0.24207988455729726,
+      "f1_default_folds": [
+        0.25060695980577286,
+        0.24312982266143224,
+        0.2353582130209752,
+        0.23966267682263329,
+        0.24164175047567274
+      ],
       "threshold": 0.20424018933195712,
       "n_features": 334,
       "finite": true,
-      "seconds": 975.7518264055252
+      "seconds": 2614.4578437805176
+    },
+    {
+      "label": "v1",
+      "pipeline": {
+        "domain_drop": true,
+        "drop_redundant": true,
+        "select_features": true,
+        "convert_units": true,
+        "skip_logic_fill": true,
+        "max_missing_frac": 1.0,
+        "keep_informative": true,
+        "missing_indicators": true,
+        "min_missing_diff": 0.03,
+        "min_missing_rows": 500,
+        "impute": "by_type",
+        "recode_binary": true,
+        "one_hot": true,
+        "one_hot_min_rows": 500,
+        "one_hot_ordinal": true,
+        "binning": true,
+        "poly_degree": 1,
+        "interaction_top": 0,
+        "interaction_pairs": []
+      },
+      "fit": {
+        "lambda_": 0.0001,
+        "max_iters": 20,
+        "n_trees": 200,
+        "max_depth": 4,
+        "learning_rate": 0.05
+      },
+      "f1_mean": 0.4334911057414675,
+      "f1_std": 0.001928994687764754,
+      "f1_folds": [
+        0.4359951124847265,
+        0.4329799446282666,
+        0.43172606568832983,
+        0.4312638580931264,
+        0.4354905478128881
+      ],
+      "f1_val_best": 0.4348881746907984,
+      "f1_default": 0.23920769888255658,
+      "f1_default_folds": [
+        0.24413400244134004,
+        0.24219386369807222,
+        0.23045379989065062,
+        0.23863481228668942,
+        0.24062201609603057
+      ],
+      "threshold": 0.2092186893754595,
+      "n_features": 334,
+      "finite": true,
+      "seconds": 2614.4578437805176
+    },
+    {
+      "label": "v1",
+      "pipeline": {
+        "domain_drop": true,
+        "drop_redundant": true,
+        "select_features": true,
+        "convert_units": true,
+        "skip_logic_fill": true,
+        "max_missing_frac": 1.0,
+        "keep_informative": true,
+        "missing_indicators": true,
+        "min_missing_diff": 0.03,
+        "min_missing_rows": 500,
+        "impute": "by_type",
+        "recode_binary": true,
+        "one_hot": true,
+        "one_hot_min_rows": 500,
+        "one_hot_ordinal": true,
+        "binning": true,
+        "poly_degree": 1,
+        "interaction_top": 0,
+        "interaction_pairs": []
+      },
+      "fit": {
+        "lambda_": 0.0001,
+        "max_iters": 20,
+        "n_trees": 400,
+        "max_depth": 3,
+        "learning_rate": 0.05
+      },
+      "f1_mean": 0.4337623056502958,
+      "f1_std": 0.0019828548974119595,
+      "f1_folds": [
+        0.43586690017513136,
+        0.4355309010738923,
+        0.43105305682736333,
+        0.43175136497270056,
+        0.4346093052023916
+      ],
+      "f1_val_best": 0.43509044006948044,
+      "f1_default": 0.23949718144826476,
+      "f1_default_folds": [
+        0.24864425162689804,
+        0.24210383624779722,
+        0.22991651840700697,
+        0.23829671079568718,
+        0.23852459016393443
+      ],
+      "threshold": 0.20980395492680343,
+      "n_features": 334,
+      "finite": true,
+      "seconds": 2614.4578437805176
+    },
+    {
+      "label": "v1",
+      "pipeline": {
+        "domain_drop": true,
+        "drop_redundant": true,
+        "select_features": true,
+        "convert_units": true,
+        "skip_logic_fill": true,
+        "max_missing_frac": 1.0,
+        "keep_informative": true,
+        "missing_indicators": true,
+        "min_missing_diff": 0.03,
+        "min_missing_rows": 500,
+        "impute": "by_type",
+        "recode_binary": true,
+        "one_hot": true,
+        "one_hot_min_rows": 500,
+        "one_hot_ordinal": true,
+        "binning": true,
+        "poly_degree": 1,
+        "interaction_top": 0,
+        "interaction_pairs": []
+      },
+      "fit": {
+        "lambda_": 0.0001,
+        "max_iters": 20,
+        "n_trees": 400,
+        "max_depth": 4,
+        "learning_rate": 0.05
+      },
+      "f1_mean": 0.4337014832028142,
+      "f1_std": 0.0019839189037076767,
+      "f1_folds": [
+        0.43401291445984186,
+        0.4360690383938006,
+        0.4326547982126392,
+        0.43048225001807533,
+        0.435288414929714
+      ],
+      "f1_val_best": 0.43567354381357914,
+      "f1_default": 0.23704984575075067,
+      "f1_default_folds": [
+        0.24151560583344692,
+        0.24217797643234457,
+        0.2316453959105256,
+        0.23537452159650082,
+        0.2345357289809354
+      ],
+      "threshold": 0.21829216803129342,
+      "n_features": 334,
+      "finite": true,
+      "seconds": 2614.4578437805176
     }
   ],
   "best": {
@@ -212,23 +244,31 @@
     "fit": {
       "lambda_": 0.0001,
       "max_iters": 20,
-      "n_trees": 200,
+      "n_trees": 400,
       "max_depth": 3,
       "learning_rate": 0.05
     },
-    "f1_mean": 0.4335290652607252,
-    "f1_std": 0.002242976880813505,
+    "f1_mean": 0.4337623056502958,
+    "f1_std": 0.0019828548974119595,
     "f1_folds": [
-      0.435279364637035,
-      0.43488293179504584,
-      0.431277988287978,
-      0.43037974683544306,
-      0.4358252947481243
+      0.43586690017513136,
+      0.4355309010738923,
+      0.43105305682736333,
+      0.43175136497270056,
+      0.4346093052023916
     ],
-    "f1_val_best": 0.4344228605777811,
-    "threshold": 0.20424018933195712,
+    "f1_val_best": 0.43509044006948044,
+    "f1_default": 0.23949718144826476,
+    "f1_default_folds": [
+      0.24864425162689804,
+      0.24210383624779722,
+      0.22991651840700697,
+      0.23829671079568718,
+      0.23852459016393443
+    ],
+    "threshold": 0.20980395492680343,
     "n_features": 334,
     "finite": true,
-    "seconds": 975.7518264055252
+    "seconds": 2614.4578437805176
   }
 }
