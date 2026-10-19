@@ -300,6 +300,16 @@ def test_select_features_by_rule():
         fit_preprocess(x, y, names, dict(config, select_features=("R9",)))
 
 
+def test_keep_leakage_keeps_harehab1():
+    x, y, names = fake_brfss()
+    config = dict(DEFAULT_CONFIG, min_missing_rows=5)
+    out = fit_preprocess(x, y, names, config)["out_names"]
+    assert not any(n.startswith("HAREHAB1") for n in out)
+    # also against domain_drop (HAREHAB1 is in DOMAIN_DROP too)
+    out = fit_preprocess(x, y, names, dict(config, keep_leakage=True))["out_names"]
+    assert "HAREHAB1" in out
+
+
 def test_labels_are_needed_only_for_the_missing_steps():
     x, y, names = fake_brfss()
     with pytest.raises(ValueError):

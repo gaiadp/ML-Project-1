@@ -6,7 +6,10 @@ the real training set (N_ROWS rows), with the real column names:
    fit_preprocess / apply_preprocess and gives finite values;
 2. the final model and the models of the ablation (logistic regression + trees, no
    trees, Newton, plain GD) train and predict probabilities on the real pipeline,
-   with few trees and steps so that it stays fast.
+   with few trees and steps so that it stays fast;
+3. the HAREHAB1 variants of experiments/leakage.py: the pipeline with
+   keep_leakage=True has the HAREHAB1 columns, the known-positive rule finds the
+   rows where it was asked (all positive in the training rows).
 The F1 printed is measured on the training rows: it only shows that the models learn,
 it is not a score to report.
 
@@ -29,6 +32,7 @@ from src.data import load_data  # noqa: E402
 from src.metrics import best_threshold  # noqa: E402
 from src.models import fit, predict_scores  # noqa: E402
 from src.pipeline import apply_preprocess, fit_preprocess  # noqa: E402
+from src.rules import known_positives  # noqa: E402
 
 N_ROWS = 20000  # random training rows used for the check
 SEED = 1
@@ -68,6 +72,14 @@ def main():
         assert np.isfinite(scores).all(), method
         assert scores.min() >= 0 and scores.max() <= 1, method
         print(f"   ok  {method:24s} {params}  training F1 {f1:.3f}")
+    print("3. HAREHAB1 variants")
+    state = fit_preprocess(x, y, names, dict(base, keep_leakage=True))
+    leak_names = [n for n in state["out_names"] if n.startswith("HAREHAB1")]
+    assert leak_names, "keep_leakage did not keep HAREHAB1"
+    known = known_positives(x, names)
+    assert np.all(y[known] == 1), "a known positive is not positive"
+    print(f"   ok  keep_leakage columns {leak_names}")
+    print(f"   ok  rule: {known.sum()} known positives, all MICHD")
     print(f"smoke test passed in {time.time() - start:.0f} s")
 
 

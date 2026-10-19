@@ -289,6 +289,12 @@ state["out_names"]                       # nomi delle colonne di tx ("bias" prim
   - `f1_default`: F1 con la soglia naturale del metodo (0.5 per le probabilità, 0 per i
     metodi lineari), senza ottimizzarla: è la riga "soglia 0.5" dell'ablation.
   - Ablation: `experiments/ablation.py` (spiegata in `experiments/README.md`).
+  - `f1_rule`: F1 dopo la regola dei positivi noti (`src/rules.py`: le righe in cui
+    `HAREHAB1` è stata chiesta, anche con risposta 7/9, messe a 1 dopo la soglia).
+- **`HAREHAB1`** (leakage dell'etichetta): tolta da ogni config. `keep_leakage=True` la
+  tiene, solo per misurarne l'effetto (`experiments/leakage.py`: modello B con la colonna,
+  modello C con la regola). La regola guarda i dati GREZZI: dopo `codes_to_nan` le risposte
+  7/9 diventerebbero NaN e 15 positivi certi andrebbero persi.
 - `run.py` deve riprodurre **esattamente** la nostra migliore submission: fissare i seed e
   usare lo stesso preprocessing (con statistiche fittate sul training completo).
 - Gli `Id` della submission sono quelli di `x_test` (`test_ids` di `load_csv_data`), nello

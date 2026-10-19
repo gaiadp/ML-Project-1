@@ -30,6 +30,7 @@ src/                  # Our own reusable pipeline code
   preprocessing.py     # Cleaning, missing values, standardization
   features.py           # Feature engineering (encoding, polynomial expansion, ...)
   models.py             # Common fit / predict interface: 6 base methods + extra methods
+  rules.py              # Known positives: rows where HAREHAB1 was asked (label leakage)
   extra_implementations/ # Extra methods, NumPy only: adaptive GD, Newton, Sophia,
                          # UniXGrad (same loss as reg_logistic_regression),
                          # random forest and gradient boosting (histogram trees),
@@ -44,6 +45,8 @@ experiments/          # Scripts producing the results discussed in the report
   run_phases.py          # Runs the phases of a method in order, skipping those done
   baselines.py           # Table of all the methods vs trivial rules, from results/
   ablation.py            # Ablation study: pipeline steps (Newton) and model components
+  leakage.py             # HAREHAB1 (label leakage): as a feature, or as a rule after the model
+  smoke_test.py          # ~30 s check on real data before the long runs
 results/               # JSON of every phase (results/<method>/<phase>.json) and tables;
                          # one-off runs outside the phases in results/<method>/extra/
 USAGE_NOTES.md         # Pitfalls of the data and of the code (Italian)

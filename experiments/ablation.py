@@ -19,6 +19,9 @@ in how many folds the variant is better (paired comparison on the same folds).
                           Newton's exact minimum, no trees
        threshold 0.5      the final model with the natural threshold 0.5 instead of
                           the threshold that maximizes F1
+   and, if experiments/leakage.py has been run, two rows about HAREHAB1 (the label
+   leakage column): the final model with HAREHAB1 as a feature, and the final model
+   with the known-positive rule. They are read from its results, not computed here.
 
 The final model is read from results/<FINAL_METHOD>/04_final.json, the setting phase
 04 used for the submission (its PIPELINE_OVERRIDES / FIT_OVERRIDES included): run
@@ -55,6 +58,7 @@ from experiments.common import (  # noqa: E402
     result_path,
     run_grid,
 )
+from experiments.leakage import variant_rows  # noqa: E402
 from src.feature_types import SELECTION_RULES  # noqa: E402
 
 # ---- settings of the ablation ----
@@ -156,7 +160,7 @@ def data_table(rows):
     ]
 
 
-def model_table(final_rows, gd_row, final_fit):
+def model_table(final_rows, gd_row, final_fit, extra=()):
     """The model table.
 
     Args:
@@ -164,6 +168,8 @@ def model_table(final_rows, gd_row, final_fit):
             setting and, if it has trees, n_trees = 0)
         gd_row: CV row of plain gradient descent, or None
         final_fit: fit parameters of the final model
+        extra: (label, F1 per fold) of more rows, added at the end (the HAREHAB1
+            variants of experiments/leakage.py)
 
     Returns:
         list of dicts (label, f1, std, diff, better, n_folds), the final model first
@@ -185,6 +191,7 @@ def model_table(final_rows, gd_row, final_fit):
         table.append(_entry(label, gd_row["f1_folds"], reference))
     label = "threshold 0.5 instead of the tuned threshold"
     table.append(_entry(label, final["f1_default_folds"], reference))
+    table += [_entry(label, folds, reference) for label, folds in extra]
     return table
 
 
@@ -205,7 +212,9 @@ def run_model(force):
     """CV rows of the model table, computed if missing (or forced).
 
     Phase 04 already scored the final model in CV, on the same folds: its row
-    (f1_folds, f1_default_folds) is reused, only the variants are computed.
+    (f1_folds, f1_default_folds) is reused, only the variants are computed. The
+    HAREHAB1 rows come from experiments/leakage.py, if it has been run with the
+    setting of the final model.
     """
     phase = "ablation_model"
     final = load_best(FINAL_METHOD, FINAL_PHASE)
@@ -227,7 +236,12 @@ def run_model(force):
     if grid:
         final_rows += load_result(FINAL_METHOD, phase)["rows"]
     gd_row = load_result(GD_METHOD, phase)["rows"][0] if GD_METHOD else None
-    return final_rows, gd_row, final_fit
+    extra = [
+        (label, folds)
+        for label, best, folds in variant_rows(FINAL_METHOD)
+        if best["fit"] == final_fit  # the same setting as the final model
+    ]
+    return final_rows, gd_row, final_fit, extra
 
 
 def _difference(entry, first):
@@ -299,15 +313,22 @@ def main():
         nargs="+",
         choices=("data", "model"),
         default=["data", "model"],
-        help="which tables (default: both)",
+        help="which parts to compute (default: both); saved parts are always shown",
     )
     parser.add_argument(
         "--force", action="store_true", help="compute again the parts already done"
     )
     args = parser.parse_args()
 
-    data = data_table(run_data(args.force)) if "data" in args.parts else None
-    model = model_table(*run_model(args.force)) if "model" in args.parts else None
+    # --parts chooses what to compute; a table whose results are already saved is
+    # shown anyway, so that results/ablation.md always has every table available
+    data = model = None
+    data_saved = os.path.exists(result_path(DATA_METHOD, "ablation_data"))
+    model_saved = os.path.exists(result_path(GD_METHOD, "ablation_model"))
+    if "data" in args.parts or data_saved:
+        data = data_table(run_data(args.force and "data" in args.parts))
+    if "model" in args.parts or model_saved:
+        model = model_table(*run_model(args.force and "model" in args.parts))
 
     table = markdown(data, model)
     print("\n" + table)

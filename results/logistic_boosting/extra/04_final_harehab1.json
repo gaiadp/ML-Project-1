@@ -1,0 +1,76 @@
+{
+  "method": "logistic_boosting",
+  "phase": "extra/04_final_harehab1",
+  "date": "2026-10-19 22:09",
+  "from_phase": "01_baseline",
+  "known_positive_rule": false,
+  "k_fold": 5,
+  "seed": 1,
+  "best": {
+    "label": "final",
+    "pipeline": {
+      "domain_drop": true,
+      "drop_redundant": true,
+      "select_features": true,
+      "convert_units": true,
+      "skip_logic_fill": true,
+      "max_missing_frac": 1.0,
+      "keep_informative": true,
+      "missing_indicators": true,
+      "min_missing_diff": 0.03,
+      "min_missing_rows": 500,
+      "impute": "by_type",
+      "recode_binary": true,
+      "one_hot": true,
+      "one_hot_min_rows": 500,
+      "one_hot_ordinal": true,
+      "binning": true,
+      "poly_degree": 1,
+      "interaction_top": 0,
+      "interaction_pairs": [],
+      "keep_leakage": true
+    },
+    "fit": {
+      "lambda_": 0.0001,
+      "max_iters": 20,
+      "n_trees": 400,
+      "max_depth": 3,
+      "learning_rate": 0.05
+    },
+    "f1_mean": 0.4412820241238208,
+    "f1_std": 0.003224694476923573,
+    "f1_folds": [
+      0.44277130239629336,
+      0.4468573814992692,
+      0.4396142219663164,
+      0.4377631676146857,
+      0.43940404714253944
+    ],
+    "f1_val_best": 0.44336083497623474,
+    "f1_default": 0.262846159746423,
+    "f1_default_folds": [
+      0.2663431729343577,
+      0.26654089745317344,
+      0.25296119809394146,
+      0.2650634963523372,
+      0.2633220338983051
+    ],
+    "f1_rule": 0.44143872383583194,
+    "f1_rule_folds": [
+      0.44277130239629336,
+      0.4471816283924843,
+      0.43972652033105436,
+      0.4377631676146857,
+      0.43975100044464205
+    ],
+    "threshold": 0.21843659645147703,
+    "n_features": 338,
+    "finite": true,
+    "seconds": null,
+    "threshold_oof": 0.20882581421040788,
+    "f1_oof": 0.44287133283901564,
+    "train_loss": 0.2123340554376356,
+    "test_positive_rate": 0.13062836559120122,
+    "submission": "submissions/logistic_boosting_harehab1.csv"
+  }
+}

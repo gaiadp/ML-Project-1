@@ -30,6 +30,7 @@ from src.data import load_data  # noqa: E402
 from src.metrics import best_threshold, predict_labels  # noqa: E402
 from src.models import fit, predict_scores  # noqa: E402
 from src.pipeline import apply_preprocess, fit_preprocess  # noqa: E402
+from src.rules import apply_known_positives, known_positives  # noqa: E402
 
 RESULTS_DIR = os.path.join(ROOT, "results")
 SUBMISSIONS_DIR = os.path.join(ROOT, "submissions")
@@ -116,7 +117,15 @@ def run_grid(method, phase, pipelines, fit_grid, k_fold=5, seed=1):
 
 
 def run_final(
-    method, from_phase, pipeline_overrides=None, fit_overrides=None, k_fold=5, seed=1
+    method,
+    from_phase,
+    pipeline_overrides=None,
+    fit_overrides=None,
+    k_fold=5,
+    seed=1,
+    phase="04_final",
+    name=None,
+    known_positive_rule=False,
 ):
     """Final model of a method: best setting of from_phase, CV score, test predictions.
 
@@ -129,10 +138,15 @@ def run_final(
         from_phase: phase whose best row is used (e.g. "03_interactions")
         pipeline_overrides, fit_overrides: dicts that change the best setting
         k_fold, seed: as run_grid
+        phase: name of the result file, results/<method>/<phase>.json; another
+            name (e.g. "extra/04_final_rule") keeps 04_final.json unchanged
+        name: name of the submission file, submissions/<name>.csv; None = method
+        known_positive_rule: set to 1 the test rows whose label is known from the
+            questionnaire (src/rules.py), after the threshold
 
     Returns:
-        the saved dict, also written to results/<method>/04_final.json; the
-        predictions go to submissions/<method>.csv
+        the saved dict, also written to results/<method>/<phase>.json; the
+        predictions go to submissions/<name>.csv
     """
     best = load_best(method, from_phase)
     config = dict(best["pipeline"], **(pipeline_overrides or {}))
@@ -154,16 +168,25 @@ def run_final(
     del tx
     tx_test = apply_preprocess(x_test, names, state)
     y_pred = predict_labels(predict_scores(method, w, tx_test), threshold)
-    path = os.path.join(SUBMISSIONS_DIR, method + ".csv")
+    if known_positive_rule:
+        known = known_positives(x_test, names)
+        changed = int(np.sum(known & (y_pred == -1)))
+        y_pred = apply_known_positives(y_pred, known)
+        print(
+            f"known-positive rule: {known.sum()} test rows set to 1 "
+            f"({changed} changed); CV F1 with the rule {out['f1_rule'].mean():.4f}"
+        )
+    path = os.path.join(SUBMISSIONS_DIR, (name or method) + ".csv")
     os.makedirs(SUBMISSIONS_DIR, exist_ok=True)
     create_csv_submission(test_ids, y_pred, path)
     print(f"wrote {path}: {np.mean(y_pred == 1):.2%} predicted positive")
 
     result = dict(
         method=method,
-        phase="04_final",
+        phase=phase,
         date=time.strftime("%Y-%m-%d %H:%M"),
         from_phase=from_phase,
+        known_positive_rule=known_positive_rule,
         k_fold=k_fold,
         seed=seed,
         best=dict(
@@ -192,6 +215,9 @@ def _row(label, config, params, out, seconds):
         # F1 with the natural threshold of the method (0.5 / 0), no tuning
         f1_default=float(np.mean(out["f1_default"])),
         f1_default_folds=out["f1_default"],
+        # F1 after the known-positive rule (src/rules.py), same model and threshold
+        f1_rule=float(np.mean(out["f1_rule"])),
+        f1_rule_folds=out["f1_rule"],
         threshold=float(np.mean(out["threshold"])),
         n_features=int(out["n_features"][0]),
         finite=bool(np.isfinite(out["oof_scores"]).all()),

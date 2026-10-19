@@ -115,3 +115,19 @@ def test_f1_default_uses_the_natural_threshold():
             for f in folds
         ]
         np.testing.assert_allclose(out["f1_default"], expected)
+
+
+def test_f1_rule_sets_the_known_positives():
+    # fake_brfss: HAREHAB1 is answered by 20 positive rows only
+    x, y, names = fake_brfss()
+    k_fold = 4
+    folds = cv.stratified_k_indices(y, k_fold, seed=1)
+    out = cv.cross_validate(
+        x, y, names, CONFIG, "ridge_regression", k_fold, seed=1, lambda_=1e-2
+    )
+    known = ~np.isnan(x[:, names.index("HAREHAB1")])
+    for k, f in enumerate(folds):
+        labels = cv.predict_labels(out["oof_scores"][f], out["threshold"][k])
+        labels[known[f]] = 1
+        assert np.isclose(out["f1_rule"][k], cv.f1_score(y[f], labels))
+    assert np.all(out["f1_rule"] >= out["f1"])

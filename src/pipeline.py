@@ -8,7 +8,8 @@ one switched on or off by the config for the ablation:
     B4  skip_logic_fill     NaN of the questions that were not asked -> "no" / 0
     B10 binning             count columns of BINNED -> bin index, one-hot by B9
     B2  domain_drop         drop ids, survey design (DOMAIN_DROP); the label leakage
-                            columns (LABEL_LEAKAGE) are dropped also without it
+                            columns (LABEL_LEAKAGE) are dropped also without it ...
+        keep_leakage        ... unless this is True: only to measure the leakage
         drop_redundant      drop the duplicates of other columns (REDUNDANT)
         select_features     drop the columns not chosen from the EDA (NOT_SELECTED):
                             True = all its rules, or a tuple of rules ("R1", ...)
@@ -80,6 +81,9 @@ DEFAULT_CONFIG = dict(
     # B2: drop the columns of NOT_SELECTED (V1_CONFIG): True = all the rules R1-R4,
     # or a tuple of the rules to apply, e.g. ("R1", "R2", "R4")
     select_features=False,
+    # B2: keep the LABEL_LEAKAGE columns (HAREHAB1). Only to measure what the leakage
+    # is worth (experiments/leakage.py): never in a model that is reported as such
+    keep_leakage=False,
     convert_units=True,  # B3
     skip_logic_fill=True,  # B4
     max_missing_frac=0.5,  # B5: drop the columns with a larger fraction of NaN ...
@@ -158,7 +162,7 @@ def not_selected(rules=True):
 
 def _candidate_columns(names, config):
     """B2, B3: bool mask of the columns that can be features (fixed lists)."""
-    drop = set(LABEL_LEAKAGE)  # with any config
+    drop = set()
     if config["domain_drop"]:
         drop |= set(DOMAIN_DROP)
     if config["drop_redundant"]:
@@ -167,6 +171,13 @@ def _candidate_columns(names, config):
         drop |= set(not_selected(config["select_features"]))
     if config["convert_units"]:
         drop |= set(CONVERTED)  # the converted version is kept instead
+    # the label leakage columns are dropped with any config, also without domain_drop;
+    # keep_leakage keeps them (also against DOMAIN_DROP), only to measure the leakage.
+    # .get: the configs saved before keep_leakage existed do not have the key
+    if config.get("keep_leakage", False):
+        drop -= set(LABEL_LEAKAGE)
+    else:
+        drop |= set(LABEL_LEAKAGE)
     return np.array([name not in drop for name in names])
 
 

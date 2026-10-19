@@ -11,6 +11,7 @@ import numpy as np
 from src.metrics import best_threshold, f1_score, predict_labels
 from src.models import default_threshold, fit, predict_scores
 from src.pipeline import apply_preprocess, fit_preprocess
+from src.rules import apply_known_positives, known_positives
 
 
 def ridge_weights_svd(y, tx, lambdas):
@@ -75,7 +76,9 @@ def cross_validate(x, y, names, config, method, k_fold=5, seed=1, **fit_kwargs):
     chosen on the validation part itself) is optimistic, as the single-split
     number of run.py: report f1, compare with f1_val_best. f1_default uses the
     natural threshold of the method (0.5 for probabilities, 0 for the linear
-    methods): the F1 without the threshold tuning, for the ablation.
+    methods): the F1 without the threshold tuning, for the ablation. f1_rule is f1
+    after the known-positive rule (src/rules.py: rows where HAREHAB1 was asked set
+    to 1, same threshold): the model is the same, only its labels change.
 
     Args:
         x: raw data, shape=(N, D) (Id column removed)
@@ -88,8 +91,8 @@ def cross_validate(x, y, names, config, method, k_fold=5, seed=1, **fit_kwargs):
 
     Returns:
         dict with f1_mean, f1_std (mean and standard deviation of f1 over the
-        folds); per fold (shape=(k_fold,)): f1, f1_val_best, f1_default, threshold,
-        n_features;
+        folds); per fold (shape=(k_fold,)): f1, f1_val_best, f1_default, f1_rule,
+        threshold, n_features;
         and oof_scores, shape=(N,): validation score of each row (out of fold)
     """
     return cross_validate_grid(x, y, names, config, method, [fit_kwargs], k_fold, seed)[
@@ -113,9 +116,10 @@ def cross_validate_grid(x, y, names, config, method, grid, k_fold=5, seed=1):
     """
     y = np.asarray(y)
     k_indices = stratified_k_indices(y, k_fold, seed)
+    known = known_positives(x, names)  # on the raw data, for f1_rule
     outs = []
     for _ in grid:
-        keys = ("f1", "f1_val_best", "f1_default", "threshold")
+        keys = ("f1", "f1_val_best", "f1_default", "f1_rule", "threshold")
         out = {key: np.zeros(k_fold) for key in keys}
         out["n_features"] = np.zeros(k_fold, dtype=int)
         out["oof_scores"] = np.full(len(y), np.nan)
@@ -138,7 +142,10 @@ def cross_validate_grid(x, y, names, config, method, grid, k_fold=5, seed=1):
             threshold, _ = best_threshold(predict_scores(method, w, tx_tr), y_tr)
             scores = predict_scores(method, w, tx_va)
             out["threshold"][k] = threshold
-            out["f1"][k] = f1_score(y[val_idx], predict_labels(scores, threshold))
+            labels = predict_labels(scores, threshold)
+            out["f1"][k] = f1_score(y[val_idx], labels)
+            ruled = apply_known_positives(labels, known[val_idx])
+            out["f1_rule"][k] = f1_score(y[val_idx], ruled)
             out["f1_val_best"][k] = best_threshold(scores, y[val_idx])[1]
             default = predict_labels(scores, default_threshold(method))
             out["f1_default"][k] = f1_score(y[val_idx], default)

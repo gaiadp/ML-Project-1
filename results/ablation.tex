@@ -25,5 +25,7 @@ final model & 0.4338 & -- & -- \\
 no trees on the residuals (logistic regression, Newton) & 0.4323 & $-0.0015$ & 0/5 \\
 no trees, plain GD instead of Newton & 0.4308 & $-0.0029$ & 0/5 \\
 threshold 0.5 instead of the tuned threshold & 0.2395 & $-0.1943$ & 0/5 \\
+with HAREHAB1 as a feature (label leakage) & 0.4413 & $+0.0075$ & 5/5 \\
+final + known-positive rule (HAREHAB1 asked -> 1) & 0.4400 & $+0.0062$ & 5/5 \\
 \hline
 \end{tabular}

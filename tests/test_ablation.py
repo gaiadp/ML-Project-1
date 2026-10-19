@@ -94,6 +94,11 @@ def test_model_table():
     assert np.isclose(table[2]["diff"], -0.005) and table[2]["better"] == 1
     # threshold 0.5: the F1 with the default threshold of the final row
     assert np.isclose(table[3]["f1"], 0.24)
+    # rows of experiments/leakage.py, at the end
+    extra = [("with HAREHAB1", [0.45, 0.46])]
+    table = model_table(final_rows, gd_row, final_fit, extra)
+    assert table[-1]["label"] == "with HAREHAB1" and len(table) == 5
+    assert np.isclose(table[-1]["diff"], 0.015) and table[-1]["better"] == 2
     # saved results of another final setting
     with pytest.raises(ValueError):
         model_table(final_rows, gd_row, dict(lambda_=1e-4, n_trees=400))

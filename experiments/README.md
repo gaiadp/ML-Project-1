@@ -8,7 +8,8 @@ Scripts that produce the results of the report. Contents:
 4. [One-off runs outside the phases](#one-off-runs-outside-the-phases)
 5. [Baseline table: `baselines.py`](#baseline-table-baselinespy)
 6. [Ablation study: `ablation.py`](#ablation-study-ablationpy)
-7. [Notes](#notes)
+7. [HAREHAB1, the label leakage column: `leakage.py`](#harehab1-the-label-leakage-column-leakagepy)
+8. [Notes](#notes)
 
 Other scripts: `eda.py` (exploratory data analysis, tables in `build/eda/`),
 `imbalance.py` (class imbalance: threshold vs class weights vs undersampling),
@@ -314,6 +315,36 @@ The CV results go to `results/reg_logistic_newton/ablation_data.json`,
 `results/reg_logistic_regression/ablation_model.json`; a part whose results exist is
 not computed again (use `--force` after changing the final model or the settings).
 The tables go to `results/ablation.md` and `results/ablation.tex` (LaTeX tabular).
+
+## HAREHAB1, the label leakage column: `leakage.py`
+
+`HAREHAB1` ("after your heart attack, did you go to rehabilitation?") is asked only to
+people who had a heart attack, which is part of the definition of MICHD: the 773
+training rows where it was asked (answers 1, 2, 7, 9) are all positive. Every model
+drops it (`LABEL_LEAKAGE`). `leakage.py` trains two variants of the final model, with
+its setting and folds, without touching it (model A = phase 04):
+
+| Model | What | Result | Submission |
+|---|---|---|---|
+| A | final model, no HAREHAB1 | `results/<method>/04_final.json` | `submissions/<method>.csv` |
+| B (`harehab1`) | HAREHAB1 as a feature (`keep_leakage=True` in the pipeline) | `results/<method>/extra/04_final_harehab1.json` | `submissions/<method>_harehab1.csv` |
+| C (`rule`) | model A, then the known-positive rule (`src/rules.py`): rows where HAREHAB1 was asked set to 1 after the threshold | `results/<method>/extra/04_final_rule.json` | `submissions/<method>_rule.csv` |
+
+B learns both sides of the leakage (asked → heart attack; in the states with the
+module, not asked → no heart attack, 4.1% MICHD instead of 8.8%); C only applies the
+certain side. Every CV now also saves `f1_rule` (F1 after the rule, same model and
+threshold), which gives the CV number of C. A variant already computed is skipped
+(`--force`). At the end the script prints A, B and C on the same folds; `ablation.py`
+adds B and C as rows of its model table.
+
+```bash
+python experiments/leakage.py                                  # B and C of logistic_boosting (~2 h)
+python experiments/leakage.py --variants rule                  # only C
+python experiments/leakage.py --method reg_logistic_newton     # the same for Newton (minutes)
+```
+
+In the report: model A is the predictive model; B measures the leakage; C is a
+declared correction of certain labels, not part of the model.
 
 ## Notes
 

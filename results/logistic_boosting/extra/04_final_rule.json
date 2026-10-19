@@ -1,0 +1,75 @@
+{
+  "method": "logistic_boosting",
+  "phase": "extra/04_final_rule",
+  "date": "2026-10-19 22:44",
+  "from_phase": "01_baseline",
+  "known_positive_rule": true,
+  "k_fold": 5,
+  "seed": 1,
+  "best": {
+    "label": "final",
+    "pipeline": {
+      "domain_drop": true,
+      "drop_redundant": true,
+      "select_features": true,
+      "convert_units": true,
+      "skip_logic_fill": true,
+      "max_missing_frac": 1.0,
+      "keep_informative": true,
+      "missing_indicators": true,
+      "min_missing_diff": 0.03,
+      "min_missing_rows": 500,
+      "impute": "by_type",
+      "recode_binary": true,
+      "one_hot": true,
+      "one_hot_min_rows": 500,
+      "one_hot_ordinal": true,
+      "binning": true,
+      "poly_degree": 1,
+      "interaction_top": 0,
+      "interaction_pairs": []
+    },
+    "fit": {
+      "lambda_": 0.0001,
+      "max_iters": 20,
+      "n_trees": 400,
+      "max_depth": 3,
+      "learning_rate": 0.05
+    },
+    "f1_mean": 0.4337623056502958,
+    "f1_std": 0.0019828548974119595,
+    "f1_folds": [
+      0.43586690017513136,
+      0.4355309010738923,
+      0.43105305682736333,
+      0.43175136497270056,
+      0.4346093052023916
+    ],
+    "f1_val_best": 0.43509044006948044,
+    "f1_default": 0.23949718144826476,
+    "f1_default_folds": [
+      0.24864425162689804,
+      0.24210383624779722,
+      0.22991651840700697,
+      0.23829671079568718,
+      0.23852459016393443
+    ],
+    "f1_rule": 0.44001045818525586,
+    "f1_rule_folds": [
+      0.4415439380191247,
+      0.4439414302893117,
+      0.43694660584920847,
+      0.4373299853525842,
+      0.4402903314160504
+    ],
+    "threshold": 0.20980395492680343,
+    "n_features": 336,
+    "finite": true,
+    "seconds": null,
+    "threshold_oof": 0.2048126383378518,
+    "f1_oof": 0.43439704217089375,
+    "train_loss": 0.21625882467986896,
+    "test_positive_rate": 0.13605902412711765,
+    "submission": "submissions/logistic_boosting_rule.csv"
+  }
+}
