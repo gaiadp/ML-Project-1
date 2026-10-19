@@ -1,0 +1,63 @@
+{
+  "method": "reg_logistic_newton",
+  "phase": "04_final",
+  "date": "2026-10-19 11:44",
+  "from_phase": "01_baseline",
+  "k_fold": 5,
+  "seed": 1,
+  "best": {
+    "label": "final",
+    "pipeline": {
+      "domain_drop": true,
+      "drop_redundant": true,
+      "select_features": true,
+      "convert_units": true,
+      "skip_logic_fill": true,
+      "max_missing_frac": 1.0,
+      "keep_informative": true,
+      "missing_indicators": true,
+      "min_missing_diff": 0.03,
+      "min_missing_rows": 500,
+      "impute": "by_type",
+      "recode_binary": true,
+      "one_hot": true,
+      "one_hot_min_rows": 500,
+      "one_hot_ordinal": true,
+      "binning": true,
+      "poly_degree": 1,
+      "interaction_top": 0,
+      "interaction_pairs": []
+    },
+    "fit": {
+      "lambda_": 0.0001,
+      "max_iters": 20
+    },
+    "f1_mean": 0.43229592541985945,
+    "f1_std": 0.0020340086316679275,
+    "f1_folds": [
+      0.43383015597920277,
+      0.43370146558310757,
+      0.4297509474824039,
+      0.4298847420417124,
+      0.4343123160128705
+    ],
+    "f1_val_best": 0.43288750684023763,
+    "f1_default": 0.24382554736586592,
+    "f1_default_folds": [
+      0.25191970901252864,
+      0.24862101439526435,
+      0.23583877995642702,
+      0.2392487751769189,
+      0.2434994582881907
+    ],
+    "threshold": 0.20240346763212974,
+    "n_features": 336,
+    "finite": true,
+    "seconds": null,
+    "threshold_oof": 0.1958483892149815,
+    "f1_oof": 0.4321334103145938,
+    "train_loss": 0.21970841097503346,
+    "test_positive_rate": 0.13957889540039678,
+    "submission": "submissions/reg_logistic_newton.csv"
+  }
+}
