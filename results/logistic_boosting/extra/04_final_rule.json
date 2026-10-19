@@ -1,7 +1,7 @@
 {
   "method": "logistic_boosting",
   "phase": "extra/04_final_rule",
-  "date": "2026-10-19 22:44",
+  "date": "2026-10-19 23:13",
   "from_phase": "01_baseline",
   "known_positive_rule": true,
   "k_fold": 5,
