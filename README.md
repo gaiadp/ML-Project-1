@@ -71,7 +71,9 @@ and applies the threshold of `results/ensemble/ensemble.json` (`final`). `HAREHA
 not used and the known-positive rule is not applied. It writes
 `submissions/submission.csv` and prints, at every step, the elapsed time and the values
 expected from the JSON files (619 and 336 columns, 13.605% predicted positive). Its
-running time is not measured yet. To check the output, compare it with the reference file: its SHA-256, as written
+running time, measured once on the machine of one of us, is 689 s (about 11.5 minutes):
+23 s for the data and the preprocessing of the first component, 18 s to fit it, and about
+645 s for the second component (preprocessing and 400 trees on 336 columns). To check the output, compare it with the reference file: its SHA-256, as written
 by `helpers.create_csv_submission` (CRLF line ends), is
 
 ```
