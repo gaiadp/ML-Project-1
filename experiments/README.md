@@ -11,7 +11,11 @@ Scripts that produce the results of the report. Contents:
 7. [HAREHAB1, the label leakage column: `leakage.py`](#harehab1-the-label-leakage-column-leakagepy)
 8. [Notes](#notes)
 
-Other scripts: `eda.py` (exploratory data analysis, tables in `build/eda/`),
+Every method folder has a short `README.md`; the files of `results/` (what writes them,
+cost, reproducibility) are listed in [results/README.md](../results/README.md).
+
+Other scripts: `eda.py` (exploratory data analysis, tables and figures in `build/eda/`,
+the figures of the report in `report/figures/`),
 `imbalance.py` (class imbalance: threshold vs class weights vs undersampling),
 `smoke_test.py` (~30 s check on 20k real rows before a long run: every pipeline
 variant of the ablation and the final models train and predict; writes nothing).
@@ -23,7 +27,7 @@ phase starts from the best result of the previous one:
 
 | Script | What it does | Reads | Writes |
 |---|---|---|---|
-| `01_baseline.py` | pipeline v0 vs full pipeline vs v1 (full + feature selection from the EDA, `V1_CONFIG`), no expansion | – | `results/<method>/01_baseline.json` |
+| `01_baseline.py` | pipeline v0 vs full pipeline vs v1 (full + feature selection from the EDA, `V1_CONFIG`), no expansion (the extra methods compare fewer pipelines, see below) | – | `results/<method>/01_baseline.json` |
 | `02_degree.py` | polynomial degree (`poly_degree`) | best of 01 | `results/<method>/02_degree.json` |
 | `03_interactions.py` | interaction columns (`interaction_top`, `interaction_pairs`) | best of 02 | `results/<method>/03_interactions.json` |
 | `04_final.py` | CV of the best setting, threshold on the out-of-fold scores, fit on all the training set | best of 03 (`FROM_PHASE`) | `results/<method>/04_final.json`, `submissions/<method>.csv` |
@@ -43,7 +47,9 @@ The 6 methods of `implementations.py` have the four phases. The extra methods of
 `logistic_boosting`) have only `01_baseline.py` and `04_final.py` (`FROM_PHASE =
 "01_baseline"`): the four optimizers minimize the same loss as `reg_logistic_regression`
 (phases 02 / 03 would be the same as there), and the trees build interactions by
-themselves. The trees run on pipeline v1 only, since they are slow (minutes per fit).
+themselves. The trees run on pipeline v1 only, since they are slow (minutes per fit);
+the four optimizers compare full and v1 (their saved `01_baseline.json` have only v1
+rows: see [results/README.md](../results/README.md)).
 
 A single phase can be run with the Run button or `python experiments/<method>/<phase>.py`;
 to run the chain, use `run_phases.py` (below).
@@ -116,7 +122,7 @@ python experiments/run_phases.py --help
 # the plan only: which phases would run or be skipped, with which settings (no training)
 python experiments/run_phases.py logistic_boosting --dry-run
 
-# the missing phases: for logistic_boosting 01 exists, so only 04 (final model + submission)
+# the missing phases: for logistic_boosting 01 and 04 exist, so everything is skipped
 python experiments/run_phases.py logistic_boosting
 
 # reg_logistic_regression: 01 exists, so 02, 03 and 04
@@ -134,10 +140,10 @@ python experiments/run_phases.py logistic_boosting \
 ```
 
 `--phases` takes full phase names or prefixes (`02`, `02_degree`). Example of
-`--dry-run` output:
+`--dry-run` output, for `python experiments/run_phases.py logistic_boosting --phases 04
+--force --dry-run`:
 
 ```
-skip 01_baseline: results/logistic_boosting/01_baseline.json exists (--force to run it again)
 run 04_final -> results/logistic_boosting/04_final.json
     METHOD = logistic_boosting
     FROM_PHASE = 01_baseline
@@ -227,7 +233,8 @@ selection (written inline here, not in `configs/`).
   one. Every row stores the pipeline and the hyperparameters it used, so a run with a
   config file stays reproducible from its JSON.
 - Phase 04: `results/<method>/04_final.json` and the predictions
-  `submissions/<method>.csv` (gitignored), ready for AIcrowd.
+  `submissions/<method>.csv` (tracked by git, see [results/README.md](../results/README.md)),
+  ready for AIcrowd.
 
 ### Things to remember
 
@@ -244,7 +251,8 @@ selection (written inline here, not in `configs/`).
 A grid that is not one of the phases and should not replace its result (e.g. a quick
 check of a finer lambda grid) goes to `results/<method>/extra/<name>.json`: give
 `run_grid` a phase name starting with `extra/`, so the files read by the next phases
-and by `baselines.py` (`results/<method>/0*.json`) do not change:
+(`results/<method>/<phase>.json`) and by `baselines.py` (`01_baseline.json`) do not
+change:
 
 ```bash
 python -c "
@@ -288,8 +296,10 @@ tables:
 | Model | the trees on the residuals; then also Newton's exact minimum (plain GD); the tuned threshold (0.5 instead) | the final model (`logistic_boosting`) | fixed, those of the final model |
 
 Why two models: removing columns can move the best lambda, so it is searched again
-for every pipeline variant, which is affordable with Newton (~20 s per fit) and not
-with the hybrid (~16 min per CV). The hybrid is Newton plus a small correction by
+for every pipeline variant, which is affordable with Newton (~20 s per fit: 90 s per
+5-fold CV for the row "final" of `results/reg_logistic_newton/ablation_data.json`) and
+not with the hybrid (~44 min per 5-fold CV, the mean over the grid of
+`results/logistic_boosting/01_baseline.json`). The hybrid is Newton plus a small correction by
 trees, so the steps of the pipeline weigh the same on both. In the model table the
 removed components already had their hyperparameters chosen in CV.
 
@@ -305,7 +315,7 @@ folds the variant is better (paired on the same folds).
 ```bash
 python experiments/ablation.py                # missing parts, then the tables
 python experiments/ablation.py --parts data   # only the data-preparation table (~1 h)
-python experiments/ablation.py --parts model  # only the model table (~10 min: the final
+python experiments/ablation.py --parts model  # only the model table (~7 min: the final
                                               # row is reused from the CV of phase 04)
 python experiments/ablation.py --force        # compute everything again
 ```
@@ -335,7 +345,11 @@ module, not asked → no heart attack, 4.1% MICHD instead of 8.8%); C only appli
 certain side. Every CV now also saves `f1_rule` (F1 after the rule, same model and
 threshold), which gives the CV number of C. A variant already computed is skipped
 (`--force`). At the end the script prints A, B and C on the same folds; `ablation.py`
-adds B and C as rows of its model table.
+adds B and C as rows of its model table. The variants take the best row of
+`FROM_PHASE = "01_baseline"` (settings block of `leakage.py`), without the
+`PIPELINE_OVERRIDES` / `FIT_OVERRIDES` of `04_final.py`: this is the setting of model A
+for `logistic_boosting` and `reg_logistic_newton`; for a method whose phase 04 starts
+from another phase, change `FROM_PHASE` first.
 
 ```bash
 python experiments/leakage.py                                  # B and C of logistic_boosting (~2 h)
@@ -356,6 +370,9 @@ declared correction of certain labels, not part of the model.
 - The polynomial and interaction columns are pipeline step B11 (`src/pipeline.py`):
   they are fitted inside each fold, and the interaction columns chosen by
   `interaction_top` use the labels of the training part only.
-- On the full pipeline, ~317 columns become ~400 with degree 2 and ~480 with degree 3;
-  `interaction_top = k` adds k (k - 1) / 2 columns. With 260k training rows per fold,
-  ~600 columns already take ~1.3 GB per matrix.
+- The models see 321 columns with v0, 415 with the full pipeline and 334 with v1 (bias
+  included; `n_features` in `results/*/01_baseline.json`). Degree p adds the power p of
+  every standardized column with more than p distinct values (how many: not measured
+  yet, there are no `02_degree` results); `interaction_top = k` adds k (k - 1) / 2
+  columns. With 260k training rows per fold, ~600 columns already take ~1.3 GB per
+  matrix.
