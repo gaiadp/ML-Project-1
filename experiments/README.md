@@ -20,6 +20,9 @@ the figures of the report in `report/figures/`),
 `smoke_test.py` (~30 s check on 20k real rows before a long run: every pipeline
 variant of the ablation and the final models train and predict; writes nothing).
 
+The exploratory analysis (`eda.py`, analyses A1–A9), its outputs and the column lists it
+led to are described in detail in [EDA.md](EDA.md).
+
 ## Phases of a method
 
 One folder per method, `experiments/<method>/`, with the same phases in each. Every
