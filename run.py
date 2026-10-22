@@ -1,16 +1,26 @@
-"""Reproduces the AIcrowd submission of model A, submissions/logistic_boosting.csv.
+"""Reproduces our AIcrowd submission, submissions/ensemble_newton_boosting.csv.
 
-Model: regularized logistic regression solved with Newton's method, plus gradient
-boosting of trees on its residuals (logistic_boosting), on pipeline v1, fitted on the
-whole training set. The test predictions go to submissions/submission.csv.
+The submitted model is the ensemble of experiments/ensemble.py, a weighted mean of
+the test probabilities of two final models, each fitted on the whole training set:
+
+    p = a * p_newton + (1 - a) * p_boosting,    a = 0.35
+
+1. reg_logistic_newton: regularized logistic regression solved with Newton's method,
+   pipeline v1 with degree 2, log transforms and the products of the 20 columns most
+   correlated with the label;
+2. logistic_boosting (model A): the same logistic regression on pipeline v1, plus
+   gradient boosting of trees on its residuals.
+A row is predicted positive iff p >= threshold. The predictions go to
+submissions/submission.csv.
 
 HAREHAB1 is never used: it is asked only after a heart attack, so it reveals the label
 instead of predicting it (LABEL_LEAKAGE, dropped by every pipeline config; see
 src/rules.py). The known-positive rule of src/rules.py is not applied.
 
-The constants are the setting saved in results/logistic_boosting/04_final.json by
-experiments/logistic_boosting/04_final.py. That script also runs a 5-fold CV to choose
-the decision threshold; here the CV is skipped and its threshold is used directly.
+The constants are the settings saved in the result files named next to them.
+experiments/ensemble.py chooses a and the threshold on the out-of-fold probabilities
+of a 5-fold CV of each component; here the CV is skipped and the saved values are
+used directly. Model A alone: experiments/run_model_a.py.
 
 Running time: to be measured.
 
@@ -30,25 +40,55 @@ from src.metrics import predict_labels
 from src.models import fit, predict_scores
 from src.pipeline import V1_CONFIG, apply_preprocess, fit_preprocess
 
-# method of src/models.py; "method" in 04_final.json
-METHOD = "logistic_boosting"
-# src/pipeline.py; equal to "pipeline" in 04_final.json (keep_leakage=False is the
-# default, the key did not exist yet when the JSON was saved)
-PIPELINE = V1_CONFIG
-# fit parameters: "fit" in 04_final.json, best row of 01_baseline.json
-LAMBDA = 1e-4  # L2 penalty of the logistic part
-MAX_ITERS = 20  # Newton steps of the logistic part
-N_TREES = 400  # boosting rounds
-MAX_DEPTH = 3  # depth of every tree
-LEARNING_RATE = 0.05  # shrinkage of every tree
-# the other tree parameters keep the defaults of
+# component 1, weight a: results/reg_logistic_newton/extra/04_final_interactions.json
+# (experiments/reg_logistic_newton/extra_final_interactions.py)
+NEWTON = "reg_logistic_newton"
+# "pipeline" in that JSON (keep_leakage=False is the default, the key did not exist
+# yet when the JSON was saved)
+NEWTON_PIPELINE = dict(
+    V1_CONFIG,
+    poly_degree=2,
+    extra_transforms=("log",),
+    interaction_top=20,
+)
+NEWTON_FIT = dict(lambda_=1e-6, max_iters=20)  # "fit" in that JSON
+# checks only: n_features, train_loss, threshold_oof, test_positive_rate of that JSON
+NEWTON_CHECKS = dict(
+    n_features=619,
+    train_loss=0.2175880390871175,
+    threshold=0.19595568338104744,
+    positive_rate=0.14704833651797877,
+)
+
+# component 2, weight 1 - a: model A, results/logistic_boosting/04_final.json
+# (experiments/logistic_boosting/04_final.py)
+BOOSTING = "logistic_boosting"
+BOOSTING_PIPELINE = V1_CONFIG  # "pipeline" in that JSON, as for Newton
+# "fit" in that JSON; the other tree parameters keep the defaults of
 # src/extra_implementations/logistic_boosting.py: min_samples_leaf=100,
 # reg_lambda=1.0, subsample=0.5, colsample=0.5, n_bins=32
-# seed of the rows, columns and bins of the trees; "seed" in 04_final.json
+BOOSTING_FIT = dict(
+    lambda_=1e-4,
+    max_iters=20,
+    n_trees=400,
+    max_depth=3,
+    learning_rate=0.05,
+)
+# checks only: n_features, train_loss, threshold_oof, test_positive_rate of that JSON
+BOOSTING_CHECKS = dict(
+    n_features=336,
+    train_loss=0.21625882467986896,
+    threshold=0.2048126383378518,
+    positive_rate=0.13538247744082502,
+)
+
+# seed passed to fit (trees: rows, columns, bins); SEED of experiments/ensemble.py
 SEED = 1
-# "threshold_oof" in 04_final.json: maximizes F1 on the out-of-fold scores of the
-# 5-fold CV (seed 1)
-THRESHOLD = 0.2048126383378518
+# results/ensemble/ensemble.json, "final": weight a of Newton and threshold, chosen
+# on the out-of-fold probabilities (experiments/ensemble.py, choose)
+WEIGHT = 0.35
+THRESHOLD = 0.20618416941358658
+EXPECTED_POSITIVE_RATE = 0.1360498816043299  # "final", test_positive_rate
 SUBMISSION_PATH = os.path.join(ROOT, "submissions", "submission.csv")
 
 
@@ -69,48 +109,78 @@ def check_submission(path, test_ids):
     return labels
 
 
+def component_probabilities(method, config, params, checks, data, start):
+    """Test probabilities of one component, fitted on the whole training set.
+
+    The same steps as component_scores in experiments/ensemble.py after its CV:
+    fit_preprocess and fit on all the training rows, predict_scores on x_test.
+
+    Args:
+        method: one of src.models.ALL_METHODS
+        config: pipeline config (src/pipeline.py)
+        params: fit parameters
+        checks: expected values from the result file, printed next to the
+            computed ones
+        data: (x_train, y_train, x_test, names) as returned by load_data
+        start: time.time() at the start of the run
+
+    Returns:
+        probabilities of the positive class, shape=(N_test,)
+    """
+    x_train, y_train, x_test, names = data
+    state = fit_preprocess(x_train, y_train, names, config)
+    tx_train = apply_preprocess(x_train, names, state)
+    log(
+        start,
+        f"{method}: {tx_train.shape[1]} features (expected {checks['n_features']}), "
+        "fitting",
+    )
+    model, loss = fit(method, y_train, tx_train, seed=SEED, **params)
+    del tx_train
+    log(
+        start,
+        f"{method}: training log-loss {loss:.8f} "
+        f"(expected {checks['train_loss']:.8f})",
+    )
+    proba = predict_scores(method, model, apply_preprocess(x_test, names, state))
+    alone = np.mean(predict_labels(proba, checks["threshold"]) == 1)
+    log(
+        start,
+        f"{method} alone, threshold {checks['threshold']:.6f}: {alone:.3%} predicted "
+        f"positive (expected {checks['positive_rate']:.3%})",
+    )
+    return proba
+
+
 def main():
-    """Preprocess, fit on the whole training set, predict x_test, write the CSV."""
+    """Fit both components, average their test probabilities, write the CSV."""
     start = time.time()
     log(start, "loading the data (build/data.npz, built from dataset/ if missing)")
     x_train, x_test, y_train, _, test_ids, names = load_data()
     log(start, f"x_train {x_train.shape}, x_test {x_test.shape}")
+    data = (x_train, y_train, x_test, names)
 
-    state = fit_preprocess(x_train, y_train, names, PIPELINE)
-    tx_train = apply_preprocess(x_train, names, state)
-    del x_train
-    # 04_final.json: n_features 336
-    log(start, f"pipeline v1: {tx_train.shape[1]} features (expected 336)")
-
-    log(start, f"fitting {METHOD} ({N_TREES} trees)")
-    model, loss = fit(
-        METHOD,
-        y_train,
-        tx_train,
-        lambda_=LAMBDA,
-        max_iters=MAX_ITERS,
-        seed=SEED,
-        n_trees=N_TREES,
-        max_depth=MAX_DEPTH,
-        learning_rate=LEARNING_RATE,
+    p_newton = component_probabilities(
+        NEWTON, NEWTON_PIPELINE, NEWTON_FIT, NEWTON_CHECKS, data, start
     )
-    del tx_train
-    # 04_final.json: train_loss 0.21625882467986896
-    log(start, f"training log-loss {loss:.8f} (expected 0.21625882)")
+    p_boosting = component_probabilities(
+        BOOSTING, BOOSTING_PIPELINE, BOOSTING_FIT, BOOSTING_CHECKS, data, start
+    )
+    del data, x_train, x_test
 
-    tx_test = apply_preprocess(x_test, names, state)
-    del x_test
-    y_pred = predict_labels(predict_scores(METHOD, model, tx_test), THRESHOLD)
-    log(start, f"test predictions with threshold {THRESHOLD}")
+    # same expression as experiments/ensemble.py
+    p = WEIGHT * p_newton + (1 - WEIGHT) * p_boosting
+    y_pred = predict_labels(p, THRESHOLD)
+    gap = np.min(np.abs(p - THRESHOLD))
+    log(start, f"ensemble a = {WEIGHT}, threshold {THRESHOLD}; min |p - t| = {gap:.2e}")
 
     os.makedirs(os.path.dirname(SUBMISSION_PATH), exist_ok=True)
     create_csv_submission(test_ids, y_pred, SUBMISSION_PATH)
     labels = check_submission(SUBMISSION_PATH, test_ids)
-    # 04_final.json: test_positive_rate 0.13538247744082502
     log(
         start,
-        f"wrote {SUBMISSION_PATH}: {len(labels)} rows, "
-        f"{np.mean(labels == 1):.3%} predicted positive (expected 13.538%)",
+        f"wrote {SUBMISSION_PATH}: {len(labels)} rows, {np.mean(labels == 1):.3%} "
+        f"predicted positive (expected {EXPECTED_POSITIVE_RATE:.3%})",
     )
 
 
