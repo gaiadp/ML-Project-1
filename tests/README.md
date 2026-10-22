@@ -33,8 +33,13 @@ pinned in `requirements.txt`.
 | `test_feature_types.py` | 8 | Consistency of the lists in `src/feature_types.py`: 321 columns with a valid type, `DROP` type and `DOMAIN_DROP` agree, label leakage dropped, every dropped column has a reason, `CONVERTED`, `REDUNDANT`, one-hot and binned columns, `NOT_SELECTED` only removes columns the other lists keep. |
 | `test_cross_validation.py` | 7 | `src/cross_validation.py`: stratified folds, the preprocessing never sees the validation rows, reproducible CV with SGD, `cross_validate_grid` equals `cross_validate`, `cross_validation_ridge` equals `ridge_regression`, `f1_default` uses the natural threshold, `f1_rule` sets the known positives. |
 | `test_eda.py` | 7 | Statistics helpers of `experiments/eda.py`: mutual information, discretization, determination, pairwise correlation, F1 of the best rule, log-odds fit of a linear column, train / test shift distance. |
-| `test_run_phases.py` | 5 | `experiments/run_phases.py`, no data and no training: phase scripts of a method, `--phases` selection, the run / skip plan, conversion of the config-file settings, loading the settings of a phase script. |
+| `test_run_phases.py` | 5 | `experiments/run_phases.py`, no data and no training: phase scripts of a method (with the sub-phase `02b_transforms` for `ridge_regression` and `reg_logistic_newton`), `--phases` selection (a prefix also selects the sub-phases), the run / skip plan, conversion of the config-file settings, loading the settings of a phase script. |
 | `test_ablation.py` | 4 | `experiments/ablation.py` on fake rows and data: the data-preparation variants, every variant runs through the pipeline, the data and model tables. |
 | `test_baselines.py` | 4 | `experiments/baselines.py`: keys of the trivial rules, prevalence scores, the trivial baselines, best row per pipeline. |
 | `test_rules.py` | 3 | `src/rules.py` and `experiments/leakage.py`: known positives from the raw answers, `apply_known_positives`, the leakage variants are valid options of `run_final`. |
 | `test_data.py` | 2 | `src/data.py`: the cache round trip (written, then reloaded without the CSV files) and the check of the label row order. |
+
+Not covered by any test (no test file mentions them): the option `extra_transforms`
+of `src/pipeline.py`, `check_transforms` of `experiments/common.py`,
+`experiments/ensemble.py`, `experiments/feature_screening.py` and the `extra_*.py`
+scripts.
