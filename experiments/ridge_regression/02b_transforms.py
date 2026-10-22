@@ -4,7 +4,8 @@ Starts from the best pipeline of 02_degree and adds sqrt(x - min) and / or
 log(1 + x - min) of the continuous and count columns (pipeline step B11,
 extra_transforms), next to the original column and its powers. Writes
 results/ridge_regression/02b_transforms.json; its best row also contains the
-"none" variant, so 03_interactions can start from 02b_transforms.
+"none" variant, so 03_interactions could start from 02b_transforms (for now
+ridge_regression/03_interactions.py has FROM_PHASE = "02_degree").
 
 Before the CV, a quick check on the whole training set (CHECK = True, see
 experiments.common.check_transforms): correlation of the label with x, sqrt and

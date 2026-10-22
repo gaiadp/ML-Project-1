@@ -1,11 +1,12 @@
 """Run the phases of one method in order (01 -> 04), skipping the ones already done.
 
 The phases of a method are its scripts experiments/<method>/0*.py (01_baseline,
-02_degree, 02b_transforms, 03_interactions, 04_final; only 01 and 04 for the tree
-methods and sophia). Each
-phase reads the best result of the previous one (experiments/common.py), so they
-must run in order. A phase is skipped when its result results/<method>/<phase>.json
-already exists, unless:
+02_degree, 02b_transforms, 03_interactions, 04_final; 02b only for ridge_regression
+and reg_logistic_newton; only 01 and 04 for the extra methods other than
+reg_logistic_newton; the extra_*.py scripts are not phases). Each phase reads the
+best result of the previous one (experiments/common.py), so they must run in order.
+A phase is skipped when its result results/<method>/<phase>.json already exists,
+unless:
     --force                  every selected phase runs again
     --config file.json       the file changes some settings of the phase
     a previous phase runs    the later phases depend on it, they run again too

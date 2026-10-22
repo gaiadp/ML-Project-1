@@ -3,8 +3,8 @@
 % https://github.com/epfml/ML_course/tree/main/projects/project1/latex-example-paper
 %
 % Hard limit: 2 pages of content + 1 extra page for references only.
-% Compile with:
-%   pdflatex report && bibtex report && pdflatex report && pdflatex report
+% Compile with (auxiliary files in build/, see README.md):
+%   latexmk -pdf -output-directory=build report.tex
 
 \documentclass[10pt,conference,compsocconf]{IEEEtran}
 
@@ -67,8 +67,8 @@
 \label{sec:results}
 % Report cross-validated performance of the baseline methods (Table 1: the 6
 % required methods) and of your improved pipeline. Include the ablation study:
-% which modification helped the most? See experiments/baselines.py,
-% experiments/tuning.py, experiments/ablation.py.
+% which modification helped the most? See experiments/baselines.py, the phases
+% of experiments/<method>/ (run_phases.py), experiments/ablation.py.
 
 % Example table:
 % \begin{table}[htbp]

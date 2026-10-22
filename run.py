@@ -1,4 +1,4 @@
-"""Reproduces our best AIcrowd submission, submissions/logistic_boosting.csv (model A).
+"""Reproduces the AIcrowd submission of model A, submissions/logistic_boosting.csv.
 
 Model: regularized logistic regression solved with Newton's method, plus gradient
 boosting of trees on its residuals (logistic_boosting), on pipeline v1, fitted on the

@@ -19,7 +19,7 @@ HAREHAB1 non è mai usata come feature. Dove compare la regola "HAREHAB1 rispost
 
 1. **Polinomi e log/sqrt non servono**, nemmeno al modello lineare. Le **interazioni** aiutano Newton (+0.0016) ma non il boosting, perché gli alberi le catturavano già.
 2. **Le feature costruite a mano** (comorbidità, fattori di rischio, limitazioni, interazioni cliniche) **non migliorano l'F1**. L'abbiamo verificato prima con uno score test e poi in CV.
-3. **L'ensemble Newton + boosting è il modello migliore**, con +0.0018 in tutti i fold. Le submission sono pronte, con e senza regola.
+3. **L'ensemble Newton + boosting ha l'F1 in CV più alto**, con +0.0018 in tutti i fold. Le submission sono pronte, con e senza regola.
 4. Modelli e ottimizzatori molto diversi si fermano tutti a circa 0.43–0.435. **Il limite è l'informazione nelle feature, non il modello.**
 
 ---
@@ -177,7 +177,7 @@ C'è un effetto collaterale: i gruppi one-hot entrano tra le 20 colonne più cor
 
 **La selezione dei dati non conta più.** Dall'ablation (`results/ablation.md`): togliere una regola di selezione o usare tutte le colonne cambia l'F1 di ±0.0005. Contano solo il one-hot (−0.007 se lo togli) e gli indicatori di missing (−0.0015).
 
-**Metodi lineari contro logistica.** Least squares, ridge e MSE-GD in baseline fanno circa 0.421, la logistica circa 0.431. Il distacco è piccolo perché con la soglia tarata least squares su etichette 0/1 trova comunque una buona direzione (è equivalente a un discriminante di Fisher). Con grado 3 + log + top 20 interazioni, least squares e ridge salgono a **0.4306**, cioè al livello della logistica in baseline: conta più lo spazio delle feature che la loss. Con le stesse feature anche la logistica sale, quindi il distacco resta.
+**Metodi lineari contro logistica.** Least squares, ridge e MSE-GD in baseline fanno circa 0.421, la logistica circa 0.431. Il distacco è piccolo perché con la soglia tarata least squares su etichette 0/1 trova comunque una buona direzione (è equivalente a un discriminante di Fisher). Con grado 3 + log + top 20 interazioni, least squares e ridge salgono a **0.4306** (risultato non salvato in `results/`), cioè al livello della logistica in baseline: conta più lo spazio delle feature che la loss. Con le stesse feature anche la logistica sale, quindi il distacco resta.
 
 **Tutti i modelli convergono a circa 0.43–0.435:** lineare (0.4323), lineare con interazioni (0.4339), solo alberi (gradient boosting 0.4298), ibrido (0.4338). Il collo di bottiglia è l'informazione contenuta nelle risposte al questionario.
 
@@ -195,7 +195,7 @@ Le altre definizioni rompono solo la seconda direzione. Per un sottoinsieme di p
 
 - [ ] Caricare su AIcrowd `ensemble_newton_boosting.csv` e `ensemble_newton_boosting_rule.csv` (al massimo 5 submission al giorno per team).
 - [ ] Decidere se la submission finale usa la regola HAREHAB1. Nel report vanno comunque riportati entrambi i numeri.
-- [ ] **Aggiornare `run.py`**: oggi riproduce ancora la submission con ridge regression, ma deve produrre *esattamente* il CSV della submission migliore. Ci sono due strade:
+- [ ] **`run.py`**: oggi riproduce il modello A (`submissions/logistic_boosting.csv`). Deve produrre *esattamente* il CSV della submission scelta: se sarà l'ensemble, va aggiornato. Ci sono due strade:
   - **solo inference:** legge `results/ensemble/scores_*.npz` e il peso e la soglia da `ensemble.json`, e il README spiega che il training è in `experiments/ensemble.py`;
   - **training completo:** `python experiments/ensemble.py --force`, 1–2.5 ore. Non ho verificato che il riaddestramento completo dia esattamente lo stesso CSV; l'ho verificato solo per la versione da cache.
 
