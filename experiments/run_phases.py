@@ -1,7 +1,8 @@
 """Run the phases of one method in order (01 -> 04), skipping the ones already done.
 
 The phases of a method are its scripts experiments/<method>/0*.py (01_baseline,
-02_degree, 03_interactions, 04_final; only 01 and 04 for the extra methods). Each
+02_degree, 02b_transforms, 03_interactions, 04_final; only 01 and 04 for the tree
+methods and sophia). Each
 phase reads the best result of the previous one (experiments/common.py), so they
 must run in order. A phase is skipped when its result results/<method>/<phase>.json
 already exists, unless:
@@ -53,7 +54,8 @@ PIPELINE_CONFIGS = {"v0": V0_CONFIG, "full": DEFAULT_CONFIG, "v1": V1_CONFIG}
 
 def phase_scripts(method):
     """Phase scripts of a method, in order: dict phase name -> path."""
-    pattern = os.path.join(ROOT, "experiments", method, "0[0-9]_*.py")
+    # 0[0-9]*: also the sub-phases, e.g. 02b_transforms (sorted after 02_degree)
+    pattern = os.path.join(ROOT, "experiments", method, "0[0-9]*_*.py")
     return {os.path.basename(p)[:-3]: p for p in sorted(glob.glob(pattern))}
 
 

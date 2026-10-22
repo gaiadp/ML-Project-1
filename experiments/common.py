@@ -7,6 +7,7 @@ reads its best row with load_best, so the numbers never have to be copied by han
 Phases (one folder per method of implementations.py, same files in each):
     01_baseline.py      pipeline v0 / full / v1 (EDA feature selection), no expansion
     02_degree.py        polynomial degree, on the best pipeline of 01
+    02b_transforms.py   sqrt / log of the continuous columns, on the best of 02
     03_interactions.py  number of interaction columns, on the best pipeline of 02
     04_final.py         CV of the best setting, fit on the full training set,
                         test predictions in submissions/<method>.csv
@@ -201,6 +202,78 @@ def run_final(
     )
     _save(result)
     return result
+
+
+def check_transforms(base, degree):
+    """Quick check of extra_transforms on the whole training set, before the CV.
+
+    For each column that gets transformed, prints |Pearson r| of the label with x,
+    sqrt and log, and the partial r of sqrt / log given 1, x, ..., x^degree, i.e.
+    what the transform adds to the columns already in the model. A partial |r|
+    below the noise level 2 / sqrt(N) means no gain to expect from that column.
+
+    Args:
+        base: pipeline config (e.g. the best of 02_degree)
+        degree: degree of the powers of x in the partial correlation
+    """
+    x, x_test, y, _, _, names = load_data()
+    del x_test
+    # degree 1, no interactions: only the original columns and their transforms
+    config = dict(
+        base,
+        poly_degree=1,
+        interaction_top=0,
+        interaction_pairs=(),
+        extra_transforms=("sqrt", "log"),
+    )
+    state = fit_preprocess(x, y, names, config)
+    tx = apply_preprocess(x, names, state)
+    del x
+    index = {name: k for k, name in enumerate(state["out_names"])}
+    y = np.asarray(y, dtype=float)
+    noise = 2 / np.sqrt(len(y))
+    columns = [state["out_names"][1 + j] for j in state["transform_cols"]]
+    print(
+        f"check on {len(y)} rows, {len(columns)} transformed columns, "
+        f"degree {degree}; noise level of r: {noise:.4f}"
+    )
+    print(
+        f"{'column':12s} {'r(x)':>7s} {'r(sqrt)':>8s} {'r(log)':>7s}   "
+        f"{'partial sqrt':>12s} {'partial log':>11s}"
+    )
+    rows = []
+    for name in columns:
+        z = tx[:, index[name]]
+        basis = np.column_stack([z**p for p in range(degree + 1)])
+        y_res = _residual(y, basis)
+        new = [tx[:, index[f"{t}({name})"]] for t in ("sqrt", "log")]
+        r = [_corr(v, y) for v in new]
+        partial = [_corr(_residual(v, basis), y_res) for v in new]
+        rows.append((name, _corr(z, y), *r, *partial))
+    # largest gain first
+    rows.sort(key=lambda row: -max(abs(row[4]), abs(row[5])))
+    for name, r_x, r_s, r_l, p_s, p_l in rows:
+        print(
+            f"{name:12s} {abs(r_x):7.4f} {abs(r_s):8.4f} {abs(r_l):7.4f}   "
+            f"{p_s:+12.4f} {p_l:+11.4f}"
+        )
+    for k, t in ((4, "sqrt"), (5, "log")):
+        n = sum(abs(row[k]) > noise for row in rows)
+        print(f"{t}: partial |r| above the noise level in {n} / {len(rows)} columns")
+    print()
+
+
+def _corr(a, b):
+    a = a - a.mean()
+    b = b - b.mean()
+    den = np.sqrt((a @ a) * (b @ b))
+    return float(a @ b / den) if den > 0 else 0.0
+
+
+def _residual(v, basis):
+    """v minus its least squares projection on the columns of basis."""
+    coef, *_ = np.linalg.lstsq(basis, v, rcond=None)
+    return v - basis @ coef
 
 
 def _row(label, config, params, out, seconds):

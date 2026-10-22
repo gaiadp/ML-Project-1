@@ -1,0 +1,407 @@
+{
+  "method": "reg_logistic_newton",
+  "phase": "extra/feature_screening",
+  "date": "2026-10-22 14:35",
+  "from_phase": "03_interactions",
+  "reference_phase": "02b_transforms",
+  "k_fold": 5,
+  "seed": 1,
+  "level1": [
+    {
+      "label": "REFERENCE: top 20 interactions",
+      "df": 190,
+      "chi2": 1152.8658802343828,
+      "p": 6.628707844062796e-129,
+      "delta_loss": 0.001756694470620907,
+      "top20": null,
+      "columns": null
+    },
+    {
+      "label": "comorbidity count (number)",
+      "df": 1,
+      "chi2": 0.04212284351853128,
+      "p": 0.8190685269823831,
+      "delta_loss": 6.418523400205904e-08,
+      "top20": true,
+      "columns": [
+        "comorbidities"
+      ]
+    },
+    {
+      "label": "comorbidity count (one-hot)",
+      "df": 3,
+      "chi2": 17.65407970268067,
+      "p": 0.0006159012878459268,
+      "delta_loss": 2.6900634956162356e-05,
+      "top20": true,
+      "columns": [
+        "comorb>=2",
+        "comorb>=3",
+        "comorb>=4"
+      ]
+    },
+    {
+      "label": "risk factor count (one-hot)",
+      "df": 4,
+      "chi2": 18.17522706606326,
+      "p": 0.0012631946348008476,
+      "delta_loss": 2.769474007049425e-05,
+      "top20": true,
+      "columns": [
+        "risk>=2",
+        "risk>=3",
+        "risk>=4",
+        "risk>=5"
+      ]
+    },
+    {
+      "label": "functional limitation (one-hot)",
+      "df": 4,
+      "chi2": 21.754151645160327,
+      "p": 0.000276106825286098,
+      "delta_loss": 3.3148173229250655e-05,
+      "top20": true,
+      "columns": [
+        "limit>=1",
+        "limit>=2",
+        "limit>=3",
+        "limit>=4"
+      ]
+    },
+    {
+      "label": "health care contact (one-hot)",
+      "df": 4,
+      "chi2": 6.707142489707234,
+      "p": 0.1507018526255442,
+      "delta_loss": 1.0220096133766946e-05,
+      "top20": true,
+      "columns": [
+        "care>=1",
+        "care>=2",
+        "care>=3",
+        "care>=4"
+      ]
+    },
+    {
+      "label": "clinical interactions",
+      "df": 14,
+      "chi2": 54.82599548613531,
+      "p": 1.302915384334991e-06,
+      "delta_loss": 8.354182803744695e-05,
+      "top20": false,
+      "columns": [
+        "age*male",
+        "age*diabetes",
+        "age*hypertension",
+        "age*high_chol",
+        "age*current_smoker",
+        "age*ever_smoker",
+        "age*stroke",
+        "male*ever_smoker",
+        "male*diabetes",
+        "diabetes*hypertension",
+        "hypertension*high_chol",
+        "obese*diabetes",
+        "diabetes*kidney",
+        "age*comorbidities"
+      ]
+    },
+    {
+      "label": "  age*male",
+      "df": 1,
+      "chi2": 34.59871674183452,
+      "p": 7.10769971364305e-08,
+      "delta_loss": 5.272024737049465e-05,
+      "top20": null,
+      "columns": [
+        "age*male"
+      ]
+    },
+    {
+      "label": "  age*diabetes",
+      "df": 1,
+      "chi2": 0.006332865071605604,
+      "p": 0.8957038986147066,
+      "delta_loss": 9.64978602039649e-09,
+      "top20": null,
+      "columns": [
+        "age*diabetes"
+      ]
+    },
+    {
+      "label": "  age*hypertension",
+      "df": 1,
+      "chi2": 0.0009478496220962623,
+      "p": 0.9252835409953004,
+      "delta_loss": 1.4442982645805267e-09,
+      "top20": null,
+      "columns": [
+        "age*hypertension"
+      ]
+    },
+    {
+      "label": "  age*high_chol",
+      "df": 1,
+      "chi2": 0.0031561401103230406,
+      "p": 0.9096739877647597,
+      "delta_loss": 4.809209792193824e-09,
+      "top20": null,
+      "columns": [
+        "age*high_chol"
+      ]
+    },
+    {
+      "label": "  age*current_smoker",
+      "df": 1,
+      "chi2": 10.07136800011582,
+      "p": 0.0016884023543091192,
+      "delta_loss": 1.534637877720423e-05,
+      "top20": null,
+      "columns": [
+        "age*current_smoker"
+      ]
+    },
+    {
+      "label": "  age*ever_smoker",
+      "df": 1,
+      "chi2": 8.70127064491137,
+      "p": 0.0033314658746146095,
+      "delta_loss": 1.3258675004055296e-05,
+      "top20": null,
+      "columns": [
+        "age*ever_smoker"
+      ]
+    },
+    {
+      "label": "  age*stroke",
+      "df": 1,
+      "chi2": 0.00036152607203152065,
+      "p": 0.9330368076817004,
+      "delta_loss": 5.508800829407419e-10,
+      "top20": null,
+      "columns": [
+        "age*stroke"
+      ]
+    },
+    {
+      "label": "  male*ever_smoker",
+      "df": 1,
+      "chi2": 0.018913355685800066,
+      "p": 0.8609780664691906,
+      "delta_loss": 2.8819473213464072e-08,
+      "top20": null,
+      "columns": [
+        "male*ever_smoker"
+      ]
+    },
+    {
+      "label": "  male*diabetes",
+      "df": 1,
+      "chi2": 6.284985691807403,
+      "p": 0.011760417337688603,
+      "delta_loss": 9.57682918891219e-06,
+      "top20": null,
+      "columns": [
+        "male*diabetes"
+      ]
+    },
+    {
+      "label": "  diabetes*hypertension",
+      "df": 1,
+      "chi2": 1.0183640274837825e-05,
+      "p": 0.9456358421759816,
+      "delta_loss": 1.551745512493002e-11,
+      "top20": null,
+      "columns": [
+        "diabetes*hypertension"
+      ]
+    },
+    {
+      "label": "  hypertension*high_chol",
+      "df": 1,
+      "chi2": 3.431987720129709e-05,
+      "p": 0.9430585155264619,
+      "delta_loss": 5.2295361971897373e-11,
+      "top20": null,
+      "columns": [
+        "hypertension*high_chol"
+      ]
+    },
+    {
+      "label": "  obese*diabetes",
+      "df": 1,
+      "chi2": 0.6993234613366954,
+      "p": 0.4078783719235341,
+      "delta_loss": 1.0656032750799143e-06,
+      "top20": null,
+      "columns": [
+        "obese*diabetes"
+      ]
+    },
+    {
+      "label": "  diabetes*kidney",
+      "df": 1,
+      "chi2": 0.05488123492895984,
+      "p": 0.8006007136223444,
+      "delta_loss": 8.362599986127637e-08,
+      "top20": null,
+      "columns": [
+        "diabetes*kidney"
+      ]
+    },
+    {
+      "label": "  age*comorbidities",
+      "df": 1,
+      "chi2": 0.7782101640770847,
+      "p": 0.38159301768682397,
+      "delta_loss": 1.1858079206379762e-06,
+      "top20": null,
+      "columns": [
+        "age*comorbidities"
+      ]
+    }
+  ],
+  "passed": [
+    "comorbidity count (one-hot)",
+    "risk factor count (one-hot)",
+    "functional limitation (one-hot)",
+    "clinical interactions"
+  ],
+  "level2": [
+    {
+      "label": "comorbidity count (one-hot)",
+      "columns": [
+        "comorb>=2",
+        "comorb>=3",
+        "comorb>=4"
+      ],
+      "f1_mean": 0.4329969243138909,
+      "f1_std": 0.0018830973695054187,
+      "f1_folds": [
+        0.43340857787810383,
+        0.43281121187139326,
+        0.4318738101713353,
+        0.4306292645943897,
+        0.43626175705423254
+      ],
+      "diff": -0.000910423610998301,
+      "better": 2,
+      "n_features": 620
+    },
+    {
+      "label": "risk factor count (one-hot)",
+      "columns": [
+        "risk>=2",
+        "risk>=3",
+        "risk>=4",
+        "risk>=5"
+      ],
+      "f1_mean": 0.4334860514027466,
+      "f1_std": 0.002100083343479984,
+      "f1_folds": [
+        0.4324286996754368,
+        0.4363909363909364,
+        0.4319845325231322,
+        0.4310568329126015,
+        0.43556925551162634
+      ],
+      "diff": -0.0004212965221425891,
+      "better": 2,
+      "n_features": 621
+    },
+    {
+      "label": "functional limitation (one-hot)",
+      "columns": [
+        "limit>=1",
+        "limit>=2",
+        "limit>=3",
+        "limit>=4"
+      ],
+      "f1_mean": 0.43282220615936967,
+      "f1_std": 0.0017383426695160185,
+      "f1_folds": [
+        0.43183984747378457,
+        0.4349821175517916,
+        0.4322436434758312,
+        0.43040554310169143,
+        0.4346398791937496
+      ],
+      "diff": -0.0010851417655195483,
+      "better": 2,
+      "n_features": 621
+    },
+    {
+      "label": "clinical interactions",
+      "columns": [
+        "age*male",
+        "age*diabetes",
+        "age*hypertension",
+        "age*high_chol",
+        "age*current_smoker",
+        "age*ever_smoker",
+        "age*stroke",
+        "male*ever_smoker",
+        "male*diabetes",
+        "diabetes*hypertension",
+        "hypertension*high_chol",
+        "obese*diabetes",
+        "diabetes*kidney",
+        "age*comorbidities"
+      ],
+      "f1_mean": 0.4327458918523237,
+      "f1_std": 0.0009279662340169453,
+      "f1_folds": [
+        0.4338379590692459,
+        0.4336001133224733,
+        0.43166532149583,
+        0.4316645979864846,
+        0.4329614673875847
+      ],
+      "diff": -0.0011614560725655477,
+      "better": 1,
+      "n_features": 645
+    },
+    {
+      "label": "all the passed groups",
+      "columns": [
+        "comorb>=2",
+        "comorb>=3",
+        "comorb>=4",
+        "risk>=2",
+        "risk>=3",
+        "risk>=4",
+        "risk>=5",
+        "limit>=1",
+        "limit>=2",
+        "limit>=3",
+        "limit>=4",
+        "age*male",
+        "age*diabetes",
+        "age*hypertension",
+        "age*high_chol",
+        "age*current_smoker",
+        "age*ever_smoker",
+        "age*stroke",
+        "male*ever_smoker",
+        "male*diabetes",
+        "diabetes*hypertension",
+        "hypertension*high_chol",
+        "obese*diabetes",
+        "diabetes*kidney",
+        "age*comorbidities"
+      ],
+      "f1_mean": 0.4326465543733672,
+      "f1_std": 0.0018036989292655994,
+      "f1_folds": [
+        0.4336101057412533,
+        0.43279340721795967,
+        0.4329237980257084,
+        0.4292809328438782,
+        0.43462452803803664
+      ],
+      "diff": -0.001260793551521988,
+      "better": 1,
+      "n_features": 656
+    }
+  ]
+}

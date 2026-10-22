@@ -1,0 +1,75 @@
+{
+  "method": "reg_logistic_newton",
+  "phase": "extra/04_final_interactions",
+  "date": "2026-10-22 10:10",
+  "from_phase": "03_interactions",
+  "known_positive_rule": false,
+  "k_fold": 5,
+  "seed": 1,
+  "best": {
+    "label": "final",
+    "pipeline": {
+      "domain_drop": true,
+      "drop_redundant": true,
+      "select_features": true,
+      "convert_units": true,
+      "skip_logic_fill": true,
+      "max_missing_frac": 1.0,
+      "keep_informative": true,
+      "missing_indicators": true,
+      "min_missing_diff": 0.03,
+      "min_missing_rows": 500,
+      "impute": "by_type",
+      "recode_binary": true,
+      "one_hot": true,
+      "one_hot_min_rows": 500,
+      "one_hot_ordinal": true,
+      "binning": true,
+      "poly_degree": 2,
+      "interaction_top": 20,
+      "interaction_pairs": [],
+      "extra_transforms": [
+        "log"
+      ]
+    },
+    "fit": {
+      "lambda_": 1e-06,
+      "max_iters": 20
+    },
+    "f1_mean": 0.4339073479248892,
+    "f1_std": 0.0016149684708255793,
+    "f1_folds": [
+      0.4340723453908985,
+      0.4340372151369433,
+      0.43105863518110865,
+      0.43428419088243136,
+      0.4360843530330643
+    ],
+    "f1_val_best": 0.43509129482499515,
+    "f1_default": 0.23520558411751305,
+    "f1_default_folds": [
+      0.24714207947740882,
+      0.24048913043478262,
+      0.22836801752464403,
+      0.23004244830891415,
+      0.22998624484181568
+    ],
+    "f1_rule": 0.43976448783179095,
+    "f1_rule_folds": [
+      0.4394281414597442,
+      0.441963666620441,
+      0.4367938322477735,
+      0.4392771724687749,
+      0.4413596263622211
+    ],
+    "threshold": 0.20680459726610217,
+    "n_features": 619,
+    "finite": true,
+    "seconds": null,
+    "threshold_oof": 0.19595568338104744,
+    "f1_oof": 0.43437645959831855,
+    "train_loss": 0.2175880390871175,
+    "test_positive_rate": 0.14704833651797877,
+    "submission": "submissions\\reg_logistic_newton_interactions.csv"
+  }
+}

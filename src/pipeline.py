@@ -25,6 +25,9 @@ one switched on or off by the config for the ablation:
         interaction_top     products z_i * z_j of the interaction_top columns most
                             correlated with the label (all pairs) ...
         interaction_pairs   ... and of the pairs of output names listed here
+        extra_transforms    sqrt(x - min) / log(1 + x - min) of the continuous and
+                            count columns, on the imputed values before B12 (min of
+                            the training set); added next to the original column
         the new columns are standardized with their own training mean / std
     B13 bias column
 
@@ -42,7 +45,9 @@ import numpy as np
 
 from src.feature_types import (
     BINNED,
+    CONTINUOUS,
     CONVERTED,
+    COUNT,
     DOMAIN_DROP,
     FEATURE_TYPES,
     LABEL_LEAKAGE,
@@ -101,7 +106,13 @@ DEFAULT_CONFIG = dict(
     poly_degree=1,  # powers 2..poly_degree of the columns with > p distinct values
     interaction_top=0,  # all pairs of the k columns most correlated with y
     interaction_pairs=(),  # extra pairs of output names, e.g. (("_AGE80", "_BMI5"),)
+    extra_transforms=(),  # names of TRANSFORMS, e.g. ("sqrt", "log")
 )
+
+# B11, extra_transforms: applied to x - min_train, clipped at 0 outside the training
+# range; only the columns with more than TRANSFORM_MIN_DISTINCT distinct values
+TRANSFORMS = {"sqrt": np.sqrt, "log": np.log1p}
+TRANSFORM_MIN_DISTINCT = 10
 
 # pipeline v0, the baseline: codes_to_nan -> drop columns with > 50% NaN -> median
 # imputation -> one-hot of the nominal columns -> standardization -> bias.
@@ -249,6 +260,44 @@ def _expand(z, powers, pairs):
     return np.hstack(new) if new else np.empty((z.shape[0], 0))
 
 
+def _fit_transforms(x, kinds, config):
+    """B11, extra_transforms: which columns to transform, on the training columns.
+
+    Args:
+        x: imputed training columns before B12, shape=(N, K), output of _transform
+        kinds: feature type of each of the K columns (None if not a kept column)
+        config: the pipeline config
+
+    Returns:
+        transforms: names of TRANSFORMS to apply
+        cols: indices of the transformed columns, shape=(T,)
+        shift: training minimum of these columns, shape=(T,)
+    """
+    transforms = list(config.get("extra_transforms", ()))
+    for t in transforms:
+        if t not in TRANSFORMS:
+            raise ValueError(f"unknown extra transform: {t!r}")
+    if not transforms:
+        return [], np.array([], dtype=int), np.array([])
+    cols = np.array(
+        [
+            k
+            for k, kind in enumerate(kinds)
+            if kind in (CONTINUOUS, COUNT)
+            and len(np.unique(x[:, k])) > TRANSFORM_MIN_DISTINCT
+        ],
+        dtype=int,
+    )
+    return transforms, cols, x[:, cols].min(axis=0)
+
+
+def _transform_columns(x, state):
+    """B11: the extra_transforms columns of x (before B12), shape=(N, T * len)."""
+    v = np.maximum(x[:, state["transform_cols"]] - state["transform_shift"], 0.0)
+    new = [TRANSFORMS[t](v) for t in state["transforms"]]
+    return np.hstack(new) if new else np.empty((x.shape[0], 0))
+
+
 def fit_preprocess(x_train, y_train, names, config=None):
     """Compute the preprocessing statistics on the training set.
 
@@ -269,6 +318,8 @@ def fit_preprocess(x_train, y_train, names, config=None):
                 by one column per category, named "NAME=value"
             mean, std: standardization statistics of the columns before B11
             powers, pairs: B11 columns, see _fit_expansion; named "NAME^p", "A*B"
+            transforms, transform_cols, transform_shift: B11 extra_transforms, see
+                _fit_transforms; named "sqrt(NAME)", "log(NAME)"
             expand_mean, expand_std: standardization statistics of the B11 columns
             out_names: names of the columns of tx, "bias" first
     """
@@ -350,19 +401,27 @@ def fit_preprocess(x_train, y_train, names, config=None):
         + [str(names[j]) + "_isnan" for j in ind_cols]
     )
 
-    # B11: powers and products of the standardized columns, standardized again
+    # B11: sqrt / log of the imputed values, then powers and products of the
+    # standardized columns; all the new columns standardized again
+    kinds = [t for k, t in enumerate(types) if k not in encoded]
+    kinds += [None] * (len(base_names) - len(kinds))  # one-hot and isnan columns
+    transforms, transform_cols, shift = _fit_transforms(x, kinds, config)
+    state["transforms"] = transforms
+    state["transform_cols"], state["transform_shift"] = transform_cols, shift
+    extra = _transform_columns(x, state)
     z = apply_standardize(x, state["mean"], state["std"])
     del x
     powers, pairs = _fit_expansion(z, y_train, base_names, config)
     state["powers"], state["pairs"] = powers, pairs
     state["expand_mean"], state["expand_std"] = fit_standardize(
-        _expand(z, powers, pairs)
+        np.hstack([_expand(z, powers, pairs), extra])
     )
     state["out_names"] = (
         ["bias"]
         + base_names
         + [f"{base_names[j]}^{p}" for p, c in powers for j in c]
         + [f"{base_names[a]}*{base_names[b]}" for a, b in pairs]
+        + [f"{t}({base_names[j]})" for t in transforms for j in transform_cols]
     )
     return state
 
@@ -379,9 +438,10 @@ def apply_preprocess(x, names, state):
         tx: shape=(N, len(state["out_names"])), bias column first, no NaN
     """
     x = _transform(_clean(x, names, state["config"]), state)
+    extra = _transform_columns(x, state)
     x = apply_standardize(x, state["mean"], state["std"])
-    if state["powers"] or state["pairs"]:
-        new = _expand(x, state["powers"], state["pairs"])
+    if state["powers"] or state["pairs"] or extra.shape[1]:
+        new = np.hstack([_expand(x, state["powers"], state["pairs"]), extra])
         new = apply_standardize(new, state["expand_mean"], state["expand_std"])
         x = np.hstack([x, new])
     return add_bias(x)
