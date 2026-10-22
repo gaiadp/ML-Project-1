@@ -21,7 +21,9 @@ PHASES = ["01_baseline", "02_degree", "03_interactions", "04_final"]
 
 
 def test_phase_scripts():
-    assert list(phase_scripts("ridge_regression")) == PHASES
+    with_transforms = PHASES[:2] + ["02b_transforms"] + PHASES[2:]
+    assert list(phase_scripts("ridge_regression")) == with_transforms
+    assert list(phase_scripts("reg_logistic_newton")) == with_transforms
     assert list(phase_scripts("random_forest")) == ["01_baseline", "04_final"]
 
 
@@ -29,6 +31,9 @@ def test_select_phases():
     scripts = dict.fromkeys(PHASES)
     assert select_phases(scripts, None) == PHASES
     assert select_phases(scripts, ["03", "02"]) == ["02_degree", "03_interactions"]
+    # a prefix selects the sub-phases too
+    scripts = dict.fromkeys(["02_degree", "02b_transforms", "03_interactions"])
+    assert select_phases(scripts, ["02"]) == ["02_degree", "02b_transforms"]
     with pytest.raises(ValueError):
         select_phases(scripts, ["05"])
 
