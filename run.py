@@ -22,7 +22,7 @@ experiments/ensemble.py chooses a and the threshold on the out-of-fold probabili
 of a 5-fold CV of each component; here the CV is skipped and the saved values are
 used directly. Model A alone: experiments/run_model_a.py.
 
-Running time: to be measured.
+Running time: about 11.5 minutes (689 s, measured once on one laptop).
 
 Usage:
     python run.py
