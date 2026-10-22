@@ -54,7 +54,7 @@ tests/                 # Our sanity tests (official grading_tests run separately
 report/                # LaTeX report (2 pages + 1 page references, from the course template)
   figures/               # Figures exported from experiments/, referenced by report.tex
 dataset/               # x_train.csv, y_train.csv, x_test.csv (gitignored)
-submissions/           # Generated prediction .csv files (gitignored)
+submissions/           # Prediction .csv files uploaded to AIcrowd (tracked, ~1.2 MB each)
 ```
 
 ## Running the experiments
