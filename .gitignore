@@ -221,8 +221,8 @@ __marimo__/
 # Dataset (too large for git, download from AIcrowd)
 dataset/*
 !dataset/.gitkeep
-# Generated predictions
-submissions/*.csv
+# Generated predictions (submissions/*.csv) are tracked: the files uploaded to AIcrowd
+# (~1.2 MB each) stay in the repository, so run.py can be checked against them
 # LaTeX build artifacts (see report/README.md: compile with -output-directory=build)
 report/build/
 # Safety net if latexmk is ever run without -output-directory=build
