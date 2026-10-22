@@ -19,10 +19,13 @@ Scripts that produce the results of the report. Contents:
 `run_phases.py`, and write only to `results/<method>/extra/` or `results/ensemble/`:
 they never overwrite a phase file such as `04_final.json`.
 
-**Which model is submitted:** [FINAL MODEL: to be decided]. Here "model A" is
-`logistic_boosting` phase 04 (`results/logistic_boosting/04_final.json`), the model of
-`run.py` and the reference of `ablation.py` and `leakage.py` (`FINAL_METHOD`,
-`METHOD`); the ensemble of `ensemble.py` is described below.
+**Which model is submitted:** the ensemble of `ensemble.py`, 0.35 x
+`reg_logistic_newton` (`extra/04_final_interactions`) + 0.65 x model A, without
+`HAREHAB1` and without the known-positive rule (`submissions/ensemble_newton_boosting.csv`,
+AIcrowd F1 0.446), reproduced by `run.py`. Here "model A" is `logistic_boosting` phase
+04 (`results/logistic_boosting/04_final.json`), the second component of the ensemble
+(alone: `run_model_a.py`) and the reference of `ablation.py` and `leakage.py`
+(`FINAL_METHOD`, `METHOD`); the ensemble of `ensemble.py` is described below.
 
 Every method folder has a short `README.md`; the files of `results/` (what writes them,
 cost, reproducibility) are listed in [results/README.md](../results/README.md).
@@ -337,7 +340,8 @@ Things to know:
 - **`--level 1`** of `feature_screening.py` rewrites
   `extra/feature_screening.json` with an empty `level2`.
 - **Which model is submitted** (model A, the ensemble, with or without the
-  known-positive rule): [FINAL MODEL: to be decided].
+  known-positive rule): the ensemble, without the rule
+  (`submissions/ensemble_newton_boosting.csv`), reproduced by `run.py`.
 
 ## Baseline table: `baselines.py`
 

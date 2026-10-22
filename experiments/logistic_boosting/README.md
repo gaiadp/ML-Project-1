@@ -1,6 +1,6 @@
 # logistic_boosting
 
-Newton's logistic regression plus gradient boosting of histogram trees on its residuals (`src/extra_implementations/logistic_boosting.py`), so the trees only learn what the linear model misses. Its phase 04 is model A: the model of `run.py` and the reference of `experiments/ablation.py` and `experiments/leakage.py`. Which model is submitted: [FINAL MODEL: to be decided].
+Newton's logistic regression plus gradient boosting of histogram trees on its residuals (`src/extra_implementations/logistic_boosting.py`), so the trees only learn what the linear model misses. Its phase 04 is model A: the second component of the submitted ensemble (`experiments/ensemble.py`, reproduced by `run.py`; alone: `experiments/run_model_a.py`) and the reference of `experiments/ablation.py` and `experiments/leakage.py`. Which model is submitted: the ensemble, 0.35 x `reg_logistic_newton` + 0.65 x model A, without the known-positive rule.
 
 - **Phases** (run by `run_phases.py`): `01_baseline.py` (pipeline v1 only: the trees are slow) and `04_final.py` (`FROM_PHASE = "01_baseline"`).
 - **Extra script** (not a phase): `extra_interactions.py`, the pipeline of `01_baseline` + top 20 interactions (CV grid, then final model) -> `extra/03_interactions.json`, `extra/04_final_interactions.json` and `submissions/logistic_boosting_interactions.csv`; `04_final.json` is not touched. `04_final.json` is one of the two components of `experiments/ensemble.py`.

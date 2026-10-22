@@ -22,10 +22,11 @@ the `extra/04_final_*` files, the ensemble and the feature screening do not save
 write to `results/<method>/extra/` or `results/ensemble/`: they never overwrite a
 phase file such as `04_final.json`.
 
-**Which model is submitted:** [FINAL MODEL: to be decided]. Below, "model A" is
-`logistic_boosting` phase 04 (`04_final.json`), the model of `run.py` and the
-reference (`FINAL_METHOD`) of `ablation.py` and `leakage.py`; the ensemble is
-described in its own rows.
+**Which model is submitted:** the ensemble (`ensemble/ensemble.json`, `final`: 0.35 x
+`reg_logistic_newton` + 0.65 x model A, without the known-positive rule), reproduced by
+`run.py`. Below, "model A" is `logistic_boosting` phase 04 (`04_final.json`), the
+second component of the ensemble and the reference (`FINAL_METHOD`) of `ablation.py`
+and `leakage.py`; the ensemble is described in its own rows.
 
 ## Files
 
