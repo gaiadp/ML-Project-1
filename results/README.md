@@ -50,7 +50,6 @@ and `leakage.py`; the ensemble is described in its own rows.
 | `logistic_boosting/extra/04_final_interactions.json` | Step 2 of `extra_interactions.py`: final model with the best row of step 1; `04_final.json` is not touched | `python experiments/logistic_boosting/extra_interactions.py` (a step whose file exists is skipped, `--force`) | Yes; also writes `submissions/logistic_boosting_interactions.csv` (not in the repository) | not measured (docstring: "~3-3.5 h in all" for both steps) |
 | `ensemble/ensemble.json` | Ensemble `p = a p_newton + (1 - a) p_boosting` of `reg_logistic_newton` `extra/04_final_interactions` and `logistic_boosting` `04_final`: CV of each component alone and of the ensemble (weight `a` in {0, 0.05, ..., 1} and threshold chosen on the other folds), final weight and threshold | `python experiments/ensemble.py` | Yes; also writes `submissions/ensemble_newton_boosting.csv` (the submitted file) and `submissions/ensemble_newton_boosting_rule.csv` | from the cache: not measured; without it: not measured (docstring: "~1 h for logistic_boosting (5 folds + the full fit), a few minutes for Newton") |
 | `ensemble/scores_reg_logistic_newton.npz`, `ensemble/scores_logistic_boosting.npz` | Cache of the ensemble: `oof` (328135 out-of-fold probabilities) and `test` (109379 test probabilities) of each component | `python experiments/ensemble.py`, only when the file is missing or with `--force` | Yes | included in the ensemble row |
-| `interactions_ensemble_screening.md` | Tables of the extra experiments: Newton degree / transforms / interactions, logistic boosting with interactions, the ensemble, the feature screening, with Δ F1 and folds better | by hand from the JSON files named in it, no script | – | – |
 | `baselines.md`, `baselines.tex` | Best F1 of phase 01 per method and pipeline, next to trivial rules computed on the same folds | `python experiments/baselines.py` (reads `*/01_baseline.json`; `--rerun` runs phase 01 again first) | Yes, from the JSON files | not measured (no training) |
 | `ablation.md`, `ablation.tex` | The two ablation tables (data preparation, model), with the leakage rows B and C | `python experiments/ablation.py` (reads the ablation JSON, `logistic_boosting/04_final.json` and the leakage variants; computes only the missing parts) | Yes, from the JSON files | not measured when every part is saved |
 
@@ -79,8 +78,9 @@ out-of-fold probability of every training row (`oof`) and the probability of eve
 test row (`test`), from the CV and the full fit of its setting. When both files exist,
 `python experiments/ensemble.py` only loads the data, chooses the weight and the
 threshold and writes the two ensemble submissions: it regenerates them in a few seconds
-without training anything. `results/interactions_ensemble_screening.md` reports that
-the regenerated submission is identical byte for byte to the first one (not re-checked
+without training anything. The results of the extra scripts
+([experiments/README.md](../experiments/README.md#results-of-the-extra-scripts)) report
+that the regenerated submission is identical byte for byte to the first one (not re-checked
 here). The cache is not invalidated by itself: after a change of
 `logistic_boosting/04_final.json` or `reg_logistic_newton/extra/04_final_interactions.json`,
 run `python experiments/ensemble.py --force`, which trains the two components again.

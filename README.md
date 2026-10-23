@@ -9,8 +9,6 @@ probabilities of a Newton logistic regression with expanded features and of a hy
 model (Newton logistic regression + boosted trees on its residuals), without the
 label-leakage column `HAREHAB1`.
 
-- Competition: https://www.aicrowd.com/challenges/epfl-machine-learning-project-1
-- Deadline: Thursday Oct 29th, 2026, 16:00.
 
 Contents:
 
@@ -158,7 +156,8 @@ led to). In short:
   `log(1 + x - min)` of the continuous and count columns, and the products of the 20
   columns most correlated with the label (chosen on the training part of each fold).
   Hand-made clinical features were tested and did not improve F1
-  (`experiments/feature_screening.py`, `results/reg_logistic_newton/extra/feature_screening.json`).
+  (`experiments/feature_screening.py`, `results/reg_logistic_newton/extra/feature_screening.json`;
+  tables in [experiments/README.md](experiments/README.md#results-of-the-extra-scripts)).
 - **Cross-validation:** `src/cross_validation.py` (`cross_validate_grid`), see the
   reproducibility details above; the experiment phases are in
   [experiments/README.md](experiments/README.md).
@@ -203,7 +202,6 @@ experiments/              # scripts that produce results/; README.md explains th
 results/                  # JSON of every phase and extra run, tables; README.md lists
                           # every file, the script that writes it and its cost
   ensemble/               # ensemble.json and the cache scores_*.npz
-  interactions_ensemble_screening.md  # results of the interactions, ensemble, screening
 tests/                    # our tests; README.md describes each file
 report/                   # LaTeX report and figures; README.md explains how to compile
 submissions/              # the csv uploaded to AIcrowd (tracked in git; run.py's output is not)
