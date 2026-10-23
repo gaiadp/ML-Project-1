@@ -69,7 +69,7 @@ settings of `results/reg_logistic_newton/extra/04_final_interactions.json` and
 no cached probabilities), averages their test probabilities with the weight a = 0.35
 and applies the threshold of `results/ensemble/ensemble.json` (`final`). `HAREHAB1` is
 not used and the known-positive rule is not applied. It writes
-`submissions/submission.csv` and prints, at every step, the elapsed time and the values
+`submissions/submission.csv` (gitignored) and prints, at every step, the elapsed time and the values
 expected from the JSON files (619 and 336 columns, 13.605% predicted positive). Its
 running time, measured once on the machine of one of us, is 689 s (about 11.5 minutes):
 23 s for the data and the preprocessing of the first component, 18 s to fit it, and about
@@ -203,10 +203,10 @@ experiments/              # scripts that produce results/; README.md explains th
 results/                  # JSON of every phase and extra run, tables; README.md lists
                           # every file, the script that writes it and its cost
   ensemble/               # ensemble.json and the cache scores_*.npz
-  interazioni_ensemble_screening.md  # summary (Italian) of interactions, ensemble, screening
+  interactions_ensemble_screening.md  # results of the interactions, ensemble, screening
 tests/                    # our tests; README.md describes each file
 report/                   # LaTeX report and figures; README.md explains how to compile
-submissions/              # the csv uploaded to AIcrowd (tracked in git)
+submissions/              # the csv uploaded to AIcrowd (tracked in git; run.py's output is not)
 dataset/                  # x_train.csv, y_train.csv, x_test.csv (gitignored)
 build/                    # data cache and EDA outputs (gitignored)
 ```

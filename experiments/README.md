@@ -307,8 +307,8 @@ run_grid(s['METHOD'], 'extra/01_more_trees', {'v1': s['V1_CONFIG']},
 ## Extra scripts: interactions, ensemble, feature screening
 
 Scripts outside the phases: `run_phases.py` does not run them and they do not touch
-the phase files. A summary of their results, in Italian, is in
-[results/interazioni_ensemble_screening.md](../results/interazioni_ensemble_screening.md);
+the phase files. Their results, in tables, are in
+[results/interactions_ensemble_screening.md](../results/interactions_ensemble_screening.md);
 the files, costs and reproducibility are in [results/README.md](../results/README.md).
 
 | Script | What it does | Reads | Writes |
@@ -335,7 +335,7 @@ Things to know:
 - **The ensemble cache.** `results/ensemble/scores_<method>.npz` hold the out-of-fold
   and test probabilities of each component; with them `ensemble.py` only chooses the
   weight and the threshold and writes the two submissions, without training (in a
-  few seconds, according to `results/interazioni_ensemble_screening.md`). The cache is not invalidated by itself: after a change of a
+  few seconds, see `results/interactions_ensemble_screening.md`). The cache is not invalidated by itself: after a change of a
   component's result file, use `--force`.
 - **`--level 1`** of `feature_screening.py` rewrites
   `extra/feature_screening.json` with an empty `level2`.

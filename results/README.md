@@ -48,9 +48,9 @@ and `leakage.py`; the ensemble is described in its own rows.
 | `reg_logistic_newton/extra/feature_screening.json` | Hand-made features: level 1 score test of 6 groups against the best row of `03_interactions` (reference: the top 20 interactions against `02b_transforms`), level 2 5-fold CV of the groups that pass | `python experiments/feature_screening.py` (`--level 1`: only the score test, and the file is rewritten with an empty `level2`) | Yes | not measured (docstring: seconds per group at level 1, ~4 min per group at level 2) |
 | `logistic_boosting/extra/03_interactions.json` | Step 1 of `extra_interactions.py`: pipeline of `01_baseline` + top 20 interactions, `n_trees` 200 and 400, `lambda_=1e-4`, `max_iters=20`, `max_depth=3`, `learning_rate=0.05` | `python experiments/logistic_boosting/extra_interactions.py` | Yes | 7025 s (1.95 h) |
 | `logistic_boosting/extra/04_final_interactions.json` | Step 2 of `extra_interactions.py`: final model with the best row of step 1; `04_final.json` is not touched | `python experiments/logistic_boosting/extra_interactions.py` (a step whose file exists is skipped, `--force`) | Yes; also writes `submissions/logistic_boosting_interactions.csv` (not in the repository) | not measured (docstring: "~3-3.5 h in all" for both steps) |
-| `ensemble/ensemble.json` | Ensemble `p = a p_newton + (1 - a) p_boosting` of `reg_logistic_newton` `extra/04_final_interactions` and `logistic_boosting` `04_final`: CV of each component alone and of the ensemble (weight `a` in {0, 0.05, ..., 1} and threshold chosen on the other folds), final weight and threshold | `python experiments/ensemble.py` | Yes; also writes `submissions/ensemble_newton_boosting.csv` and `submissions/ensemble_newton_boosting_rule.csv` (not in the repository) | from the cache: not measured; without it: not measured (docstring: "~1 h for logistic_boosting (5 folds + the full fit), a few minutes for Newton") |
+| `ensemble/ensemble.json` | Ensemble `p = a p_newton + (1 - a) p_boosting` of `reg_logistic_newton` `extra/04_final_interactions` and `logistic_boosting` `04_final`: CV of each component alone and of the ensemble (weight `a` in {0, 0.05, ..., 1} and threshold chosen on the other folds), final weight and threshold | `python experiments/ensemble.py` | Yes; also writes `submissions/ensemble_newton_boosting.csv` (the submitted file) and `submissions/ensemble_newton_boosting_rule.csv` | from the cache: not measured; without it: not measured (docstring: "~1 h for logistic_boosting (5 folds + the full fit), a few minutes for Newton") |
 | `ensemble/scores_reg_logistic_newton.npz`, `ensemble/scores_logistic_boosting.npz` | Cache of the ensemble: `oof` (328135 out-of-fold probabilities) and `test` (109379 test probabilities) of each component | `python experiments/ensemble.py`, only when the file is missing or with `--force` | Yes | included in the ensemble row |
-| `interazioni_ensemble_screening.md` | Summary in Italian of the interaction, ensemble and screening experiments, written by the group | by hand, no script | – | – |
+| `interactions_ensemble_screening.md` | Tables of the extra experiments: Newton degree / transforms / interactions, logistic boosting with interactions, the ensemble, the feature screening, with Δ F1 and folds better | by hand from the JSON files named in it, no script | – | – |
 | `baselines.md`, `baselines.tex` | Best F1 of phase 01 per method and pipeline, next to trivial rules computed on the same folds | `python experiments/baselines.py` (reads `*/01_baseline.json`; `--rerun` runs phase 01 again first) | Yes, from the JSON files | not measured (no training) |
 | `ablation.md`, `ablation.tex` | The two ablation tables (data preparation, model), with the leakage rows B and C | `python experiments/ablation.py` (reads the ablation JSON, `logistic_boosting/04_final.json` and the leakage variants; computes only the missing parts) | Yes, from the JSON files | not measured when every part is saved |
 
@@ -79,7 +79,7 @@ out-of-fold probability of every training row (`oof`) and the probability of eve
 test row (`test`), from the CV and the full fit of its setting. When both files exist,
 `python experiments/ensemble.py` only loads the data, chooses the weight and the
 threshold and writes the two ensemble submissions: it regenerates them in a few seconds
-without training anything. `results/interazioni_ensemble_screening.md` reports that
+without training anything. `results/interactions_ensemble_screening.md` reports that
 the regenerated submission is identical byte for byte to the first one (not re-checked
 here). The cache is not invalidated by itself: after a change of
 `logistic_boosting/04_final.json` or `reg_logistic_newton/extra/04_final_interactions.json`,
@@ -163,7 +163,8 @@ run `python experiments/ensemble.py --force`, which trains the two components ag
   file of its method: check `git diff --stat submissions/` before committing, and
   commit a new file only if it goes to AIcrowd. The `submission` field of a phase 04
   JSON (`submission`, `submission_rule` in `ensemble.json`) says which file it wrote.
-  The csv of the `extra/04_final_interactions` files and of the ensemble are not in
-  the repository.
+  The csv of the `extra/04_final_interactions` files are not in the repository; the
+  outputs of `run.py` (`submission.csv`) and `experiments/run_model_a.py`
+  (`submission_model_a.csv`) are gitignored: compare them with the tracked files.
 - `build/`: gitignored. `build/data.npz` (data cache, `src/data.py`),
   `build/imbalance.txt` (`experiments/imbalance.py`), `build/eda/` (`experiments/eda.py`).

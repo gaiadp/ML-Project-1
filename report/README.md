@@ -13,7 +13,6 @@ template (`IEEEtran.cls`, `IEEEtran.bst`).
 | `figures/ablation.pdf` | Figure 1 of the report: gain in F1 of each ingredient (data preparation, model, `HAREHAB1`), mean and per fold over the 5 shared folds |
 | `figures/missing_balance.png` | Not used by the report: fraction of missing values of the feature columns and class balance, written by `experiments/eda.py`, analysis A4 (`missingness_analysis`) |
 | `figures/log_odds.png` | Not used by the report: log-odds of MICHD per value / decile of the `REPORT_FEATURES` = 16 columns with the highest mutual information, near-duplicates left out, written by `experiments/eda.py`, analysis A6 (`target_relation`) |
-| `report_draft.md` | First draft in Markdown, superseded by `report.tex` |
 
 The figures are tracked in git. To write Figure 1 again (from the repository root;
 it also prints the gain and the number of better folds of every bar, the same values
