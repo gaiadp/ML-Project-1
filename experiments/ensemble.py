@@ -104,7 +104,9 @@ def honest_cv(p1, p2, y, known, weights, k_indices):
         scores = a * p1[val_idx] + (1 - a) * p2[val_idx]
         labels = predict_labels(scores, threshold)
         f1.append(f1_score(y[val_idx], labels))
-        f1_rule.append(f1_score(y[val_idx], apply_known_positives(labels, known[val_idx])))
+        f1_rule.append(
+            f1_score(y[val_idx], apply_known_positives(labels, known[val_idx]))
+        )
         chosen.append(a)
     return np.array(f1), np.array(f1_rule), np.array(chosen)
 

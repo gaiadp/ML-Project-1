@@ -4,13 +4,19 @@ Each phase script only sets its parameters and calls run_grid (phases 1-3) or
 run_final (phase 4). Every phase writes results/<method>/<phase>.json; the next phase
 reads its best row with load_best, so the numbers never have to be copied by hand.
 
-Phases (one folder per method of implementations.py, same files in each):
+Phases (one folder per method; the 6 methods of implementations.py and
+reg_logistic_newton have 01-04, the other extra methods only 01 and 04):
     01_baseline.py      pipeline v0 / full / v1 (EDA feature selection), no expansion
     02_degree.py        polynomial degree, on the best pipeline of 01
-    02b_transforms.py   sqrt / log of the continuous columns, on the best of 02
-    03_interactions.py  number of interaction columns, on the best pipeline of 02
+    02b_transforms.py   only ridge_regression and reg_logistic_newton: sqrt / log of
+                        the continuous and count columns, on the best pipeline of 02
+    03_interactions.py  number of interaction columns, on the best pipeline of the
+                        phase in its FROM_PHASE (02_degree, or 02b_transforms for
+                        reg_logistic_newton)
     04_final.py         CV of the best setting, fit on the full training set,
                         test predictions in submissions/<method>.csv
+The extra_*.py scripts of a method folder are not phases: they write to
+results/<method>/extra/.
 """
 
 import itertools

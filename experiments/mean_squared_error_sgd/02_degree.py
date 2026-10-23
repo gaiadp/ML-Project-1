@@ -2,8 +2,8 @@
 
 Starts from the best pipeline of 01_baseline, adds the powers z^2 .. z^degree
 (pipeline step B11) and writes results/mean_squared_error_sgd/02_degree.json.
-Only the columns with more than p distinct values get z^p: on the full pipeline
-~317 columns become ~400 with degree 2, ~480 with degree 3.
+Only the columns with more than p distinct values get z^p (reg_logistic_newton on v1:
+334 columns become 390 with degree 2, 444 with degree 3, in its 02_degree.json).
 
 Run with the Run button on this file, or:  python experiments/mean_squared_error_sgd/02_degree.py
 """

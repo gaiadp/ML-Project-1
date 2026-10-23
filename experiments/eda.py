@@ -2,7 +2,8 @@
 
 Run with the Run button on this file, or:  python experiments/eda.py
 Text tables go to build/eda/, exploratory figures to build/eda/figures/ (both
-gitignored), the figures for the report to report/figures/.
+gitignored), two summary figures (A4, A6) to report/figures/ (tracked in git, not
+used by the final report).
 The analyses are named A1-A9 here and in the comments of src/; the pipeline steps
 they motivate are B1-B13 (listed in src/pipeline.py).
 
@@ -88,7 +89,7 @@ STEPS = ("A1", "A2", "A3", "A4", "A5", "A6", "A7", "A8", "A9")
 EDA_DIR = os.path.join(ROOT, "build", "eda")
 # exploratory figures of A6-A7 (gitignored)
 EDA_FIGURES_DIR = os.path.join(EDA_DIR, "figures")
-# figures for the report (A4, A6), in git, referenced by report/report.tex
+# two summary figures (A4, A6), tracked in git; the final report does not use them
 FIGURES_DIR = os.path.join(ROOT, "report", "figures")
 
 # near-constant: one value (or NaN) in more than this share of the rows
@@ -166,7 +167,7 @@ CURVATURE_GAIN = 0.1
 WEAK_SIGNAL = 3.0
 # A6: number of features in the figures
 TOP_FEATURES = 24
-# A6: report figure, the REPORT_FEATURES columns with the highest MI, skipping a
+# A6: summary figure, the REPORT_FEATURES columns with the highest MI, skipping a
 # column with |Pearson r| > REPORT_MAX_CORR with one already chosen (age variants)
 REPORT_FEATURES = 16
 REPORT_MAX_CORR = 0.7
@@ -1009,7 +1010,7 @@ def target_relation(x, y01, names, feats, stats):
     mutual information, with the proposed encoding (encoding_hint). Saves
     build/eda/target_relation.txt and three figures in build/eda/figures/: MI ranking, MI vs
     |r|, log-odds per value / decile of the TOP_FEATURES columns with the highest MI.
-    The report figure report/figures/log_odds.png is the same log-odds grid for
+    The summary figure report/figures/log_odds.png is the same log-odds grid for
     REPORT_FEATURES columns, without near-duplicates (distinct_top).
 
     The proposals use the labels of the whole training set: fixed lists chosen from
@@ -1087,7 +1088,7 @@ def target_relation(x, y01, names, feats, stats):
         panel=(2.3, 1.75),
     )
     print(f"top 5 by MI: {', '.join(ranked[:5])}")
-    print(f"table: {path}, figures in {EDA_FIGURES_DIR}, report figure: {figure}")
+    print(f"table: {path}, figures in {EDA_FIGURES_DIR}, summary figure: {figure}")
 
 
 def plot_kind(s):
@@ -1102,7 +1103,7 @@ def plot_kind(s):
 def distinct_top(x, names, ranked):
     """The first REPORT_FEATURES columns of ranked, skipping the columns of
     REDUNDANT and a column with |Pearson r| > REPORT_MAX_CORR (rows where both are answered) with one chosen
-    before: one column per quantity (age, blood pressure, ...) in the report figure.
+    before: one column per quantity (age, blood pressure, ...) in the summary figure.
     """
     col = {name: j for j, name in enumerate(names)}
     chosen = []

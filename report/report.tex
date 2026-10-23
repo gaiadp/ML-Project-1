@@ -2,99 +2,247 @@
 % Adapted from the course template:
 % https://github.com/epfml/ML_course/tree/main/projects/project1/latex-example-paper
 %
-% Hard limit: 2 pages of content + 1 extra page for references only.
-% Compile with:
-%   pdflatex report && bibtex report && pdflatex report && pdflatex report
+% Limit: 2 pages of content + 1 extra page for references only.
+% Compile from report/ (auxiliary files in build/, see README.md):
+%   latexmk -pdf -output-directory=build report.tex
+% Figure 1 (figures/ablation.pdf) is written by: python report/make_figures.py
+% Every number comes from results/, experiments/EDA.md or the code; the AIcrowd
+% scores are those shown by the competition platform.
 
 \documentclass[10pt,conference,compsocconf]{IEEEtran}
 
-\usepackage{hyperref}
-\usepackage{graphicx}  % for \includegraphics
-\usepackage{amsmath}   % for math environments
+\usepackage[hidelinks]{hyperref}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{microtype}
+
+\newcommand{\pmstd}[1]{\,{\scriptsize$\pm$#1}}
 
 \begin{document}
 
-\title{Predicting Coronary Heart Disease Risk from BRFSS Lifestyle Data}
+\title{Predicting Coronary Heart Disease\\from BRFSS Survey Answers}
 
 \author{
-  Berra Claudia, Cermelli Paolo, Di Paolo Gaia\\
+  Claudia Berra, Paolo Cermelli, Gaia Di Paolo\\
+  \textit{CS-433 Machine Learning, EPFL, Switzerland}
 }
 
 \maketitle
 
 \begin{abstract}
-  % 4 things to cover: the problem, why it matters, what your solution
-  % achieves, what follows from it. Write this section last.
+We predict whether a person reports a heart attack or coronary heart disease (MICHD)
+from 321 answers to the 2015 BRFSS health survey, where only 8.8\% of 328,135 people
+are positive. We encode the survey column by column, compare 13 methods, and submit
+an ensemble of two Newton logistic regressions, one with feature products and one followed by boosted
+trees: F1 = 0.4356 in 5-fold cross-validation, 0.446 on AIcrowd. An ablation shows
+that the threshold and the encoding matter more than the model. We also find, and
+keep out, a column that reveals the label.
 \end{abstract}
 
 \section{Introduction}
 \label{sec:introduction}
-% State the problem (predicting MICHD from BRFSS survey data), why it is
-% interesting/relevant, and summarize your contributions/approach.
 
-\section{Data and Exploratory Analysis}
-\label{sec:eda}
-% Describe the dataset (size, features, class imbalance), what you found in
-% exploratory data analysis, and how it motivated your preprocessing choices.
-% See experiments/eda.py.
+The BRFSS is a yearly US telephone health survey~\cite{brfss2015}. From its 2015
+answers (328,135 training and 109,379 test people) we predict MICHD: the person was told they had a heart attack, angina or
+coronary heart disease.
+
+With 8.8\% positives, answering ``healthy'' for everybody is 91\% accurate, so
+accuracy is useless. The challenge uses F1, the harmonic mean of
+\emph{precision} (the share of flagged people who are positive) and \emph{recall}
+(the share of positive people we flag). Flagging everybody gives F1 = 0.1623, the
+best rule on one question (self-rated general health) 0.3088.
+
+We contribute a survey-aware pipeline with an ablation of its steps, 13 methods
+compared on the same folds, an ensemble that beats the best single model in every
+fold, and a measured label leak.
 
 \section{Models and Methods}
 \label{sec:methods}
-% Describe your preprocessing/feature engineering pipeline (src/preprocessing.py,
-% src/features.py) and the models you used, including the 6 required methods
-% from implementations.py and any custom extension (src/models.py). Include
-% enough detail (hyperparameters, feature transforms, number of CV folds, ...)
-% for reproducibility.
 
-% Note on least_squares: the normal-equations matrix X^T X can be
-% rank-deficient or ill-conditioned when features are collinear or
-% redundant, so np.linalg.solve (which assumes a nonsingular system) is not
-% a reliable solver. Since X^T X is symmetric positive semi-definite, we
-% instead eigendecompose it and build its Moore-Penrose pseudo-inverse by
-% inverting only the numerically nonzero eigenvalues, which yields the
-% minimum-norm solution even in the rank-deficient case (np.linalg.lstsq
-% is disallowed by the assignment).
+\subsection{Data and preparation}
+\label{sec:data}
 
-% Example figure:
-% \begin{figure}[tbp]
-%   \centering
-%   \includegraphics[width=\columnwidth]{figures/my_figure}
-%   \caption{Caption describing the figure.}
-%   \label{fig:my-figure}
-% \end{figure}
+Our exploratory analysis (\texttt{experiments/EDA.md}) found three problems.
+\emph{Codes are not values:} 7 usually means ``don't know'', but ``retired'' for the
+employment question, so we wrote one rule per column from the codebook.
+\emph{Missing values are everywhere and informative:} an average column is 47\% missing, because of optional modules and of skip logic (a follow-up question is
+not asked when it does not apply); people who answered the diabetes module have 21.9\%
+MICHD, the others 7.9\%. \emph{Many columns repeat others.} Train and test are
+distributed alike.
+
+Our pipeline fits every statistic (medians, categories, informative missing values)
+on the training rows of each fold only.
+\emph{Clean:} special codes become ``missing'' or 0, each answer gets one unit, and
+skipped questions are filled with ``no''.
+\emph{Select:} drop 41 columns that do not describe the person (ids, dates, survey
+weights) and the 30 duplicates, then keep 124 of the 236 left with four rules. The
+main one drops 89 columns whose \emph{mutual information} with the label is below
+1~millibit, i.e.\ knowing them removes almost none of the 431~millibits of uncertainty
+about the label; the others mostly keep one column per small optional module.
+\emph{Fill:} add an ``is missing'' column per group of columns missing together
+when missingness shifts the MICHD rate by $\geq$3 points; impute the median (numbers)
+or the mode (yes/no, categories).
+\emph{Encode:} yes/no becomes 0/1; categories, ordinal answers whose risk is not
+monotone (e.g.\ smoking status) and the binned days of poor physical health become one
+0/1 column per value with at least 500 people (\emph{one-hot}); then every column is
+standardized. This gives 336 inputs.
+
+\subsection{Models}
+\label{sec:models}
+
+\emph{Required methods} (\texttt{implementations.py}): linear regression by gradient
+descent (GD) and by stochastic GD, least squares, ridge regression, and logistic
+regression by GD with and without the penalty $\lambda\|w\|^2$. Linear models are fitted
+to labels $\pm1$. Least squares uses a pseudo-inverse from the eigendecomposition of
+$X^\top X$, which is singular when columns are collinear.
+
+\emph{Other optimizers} of the regularized logistic loss: adaptive-step GD
+(Barzilai--Borwein~\cite{barzilai1988}), UniXGrad~\cite{kavis2019unixgrad},
+Sophia~\cite{liu2023sophia}, and \emph{Newton's method}, which uses the curvature of
+the loss to set each step: about 10 steps reach the minimum, with no step size.
+
+\emph{Trees} on 32 bins per column~\cite{ke2017lightgbm}: a random
+forest~\cite{breiman2001} and gradient boosting~\cite{friedman2001}, i.e.\ small trees
+fitted one after the other to the errors left by the previous ones (split gain of
+XGBoost~\cite{chen2016xgboost}, half of the rows and columns per
+tree~\cite{friedman2002}).
+
+\emph{Logistic boosting} fits the logistic regression with Newton
+($\lambda = 10^{-4}$), then starts the boosting from its log-odds $x^\top w$ instead of
+a constant, like the base margin of XGBoost. The linear part captures the additive
+effects (age, general health) exactly; 400 trees (depth 3, learning rate 0.05, $\geq$100
+people per leaf) learn what is left. It is a simple combination, judged by the
+ablation.
+
+\emph{Newton with expanded features} adds squares of the non-binary columns,
+$\log(1 + x - \min x)$ of the continuous and count ones, and the products of all pairs of the 20
+columns most correlated with the label (190 products, chosen inside each fold):
+619 columns, $\lambda = 10^{-6}$.
+
+\emph{Ensemble and threshold.} The submission averages the two probabilities,
+$p = a\,p_{\text{Newton}} + (1 - a)\,p_{\text{boosting}}$ with $a = 0.35$, and
+predicts MICHD when $p \geq t$. With 8.8\% positives, $t = 0.5$ flags almost
+nobody, so $t$ maximizes F1 on training predictions, never on the scored rows
+($t = 0.206$).
+
+\subsection{Evaluation}
+\label{sec:evaluation}
+
+All experiments share 5 stratified folds (seed 1): pipeline, model and $t$ are fitted
+on four folds, F1 is measured on the fifth. We report mean $\pm$ standard deviation
+(about 0.002, so smaller differences are noise) and in how many folds a variant beats
+its reference. Hyperparameters were searched in stages on small grids. The ensemble
+weight $a \in \{0, 0.05, \ldots, 1\}$ and $t$ are chosen on out-of-fold probabilities;
+both models are then refitted on all training rows. \texttt{python run.py}
+rebuilds the submitted file byte for byte in about 11.5 minutes.
+
+\begin{table}[t]
+  \centering
+  \footnotesize
+  \caption{F1 in 5-fold CV (mean $\pm$ std), basic preparation (codes to missing,
+    $>$50\%-missing columns dropped, median, one-hot) vs.\ ours. $^\dagger$Weight and
+    threshold set on the other folds; so evaluated, its parts score 0.4336, 0.4338.}
+  \label{tab:baselines}
+  \setlength{\tabcolsep}{3.5pt}
+  \begin{tabular}{@{}l c c l@{}}
+    \toprule
+    Method & Basic & Ours & Setting (ours) \\
+    \midrule
+    Linear regr., GD & 0.4184 & 0.4211\pmstd{0.0018} & $\gamma$ 0.1, 300 it. \\
+    Linear regr., SGD & 0.3996 & 0.4084\pmstd{0.0028} & $\gamma$ $10^{-4}$, $5{\cdot}10^4$ it. \\
+    Least squares & 0.4179 & 0.4212\pmstd{0.0025} & -- \\
+    Ridge regression & 0.4181 & 0.4216\pmstd{0.0026} & $\lambda$ $10^{-3}$ \\
+    Logistic regr., GD & \textbf{0.4270} & 0.4311\pmstd{0.0017} & $\gamma$ 0.5, 500 it. \\
+    Reg.\ logistic, GD & \textbf{0.4270} & 0.4308\pmstd{0.0013} & $\lambda$ $10^{-4}$, $\gamma$ 0.3 \\
+    \midrule
+    Reg.\ logistic, Newton & -- & 0.4323\pmstd{0.0020} & $\lambda$ $10^{-4}$, ${\leq}20$ it. \\
+    Reg.\ logistic, adaptive GD & -- & 0.4322\pmstd{0.0019} & $\lambda$ $10^{-4}$, 300 it. \\
+    Reg.\ logistic, UniXGrad & -- & 0.4318\pmstd{0.0016} & $\lambda$ $10^{-4}$, 200 it. \\
+    Reg.\ logistic, Sophia & -- & 0.3928\pmstd{0.0050} & $\gamma$ 0.02, 3000 it. \\
+    Random forest & -- & 0.4158\pmstd{0.0018} & 100 trees, depth 14 \\
+    Gradient boosting & -- & 0.4298\pmstd{0.0024} & 200 trees, depth 3 \\
+    Logistic boosting & -- & 0.4338\pmstd{0.0020} & 400 trees, depth 3 \\
+    Newton, expanded features & -- & 0.4339\pmstd{0.0016} & 619 columns \\
+    Ensemble (submitted)$^\dagger$ & -- & \textbf{0.4356}\pmstd{0.0020} & $a = 0.35$ \\
+    \bottomrule
+  \end{tabular}
+\end{table}
 
 \section{Results}
 \label{sec:results}
-% Report cross-validated performance of the baseline methods (Table 1: the 6
-% required methods) and of your improved pipeline. Include the ablation study:
-% which modification helped the most? See experiments/baselines.py,
-% experiments/tuning.py, experiments/ablation.py.
 
-% Example table:
-% \begin{table}[htbp]
-%   \centering
-%   \begin{tabular}{|l|c|c|}
-%     \hline
-%     Method & CV Accuracy & CV F1 \\
-%     \hline
-%     Least squares & & \\
-%     Ridge regression & & \\
-%     Logistic regression & & \\
-%     Our final model & & \\
-%     \hline
-%   \end{tabular}
-%   \caption{Cross-validated performance comparison.}
-%   \label{tab:results}
-% \end{table}
+\emph{Baselines (Table~\ref{tab:baselines}).} Our preparation improves each required
+method by 0.0027 to 0.0088. Logistic beats linear regression by about 0.01; three
+optimizers of the same loss end within 0.0005, while Sophia, the only stochastic one,
+stays at 0.3928. Trees alone do worse.
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\columnwidth]{figures/ablation}
+  \caption{Gain in F1 from adding each ingredient, all else fixed (bars: mean of the
+    5 folds; dots: each fold; ``folds'': folds with a gain). Data rows use Newton.
+    Not shown: tuning $t$ instead of 0.5 adds 0.1943.}
+  \label{fig:ablation}
+\end{figure}
+
+\emph{Ablation (Fig.~\ref{fig:ablation}).} The threshold dwarfs everything: at
+$t = 0.5$, logistic boosting scores 0.2395 instead of 0.4338. Among data steps only one-hot
+encoding is large; the selection adds nothing measurable, and each cleaning step not
+shown changes F1 by less than 0.001. Squares and logarithms change nothing (0.4323 to
+0.4324), products do not help logistic boosting ($-0.0005$), and clinical features
+(counts of conditions, age $\times$ sex, \ldots) lower F1 by 0.0004 to 0.0013.
+
+\emph{Submissions (Table~\ref{tab:submissions}).} The ensemble weight is stable
+across folds (0.35 to 0.40). Our best online score, 0.452, used the leaking column discussed
+below: the test performance of our submission is 0.446.
+
+\begin{table}[t]
+  \centering
+  \footnotesize
+  \caption{Predictions sent to AIcrowd. ``Rule'': people asked
+    \texttt{HAREHAB1} are set positive.}
+  \label{tab:submissions}
+  \setlength{\tabcolsep}{4pt}
+  \begin{tabular}{@{}l c c c@{}}
+    \toprule
+    Prediction & \texttt{HAREHAB1} & CV F1 & AIcrowd \\
+    \midrule
+    \textbf{Ensemble (submitted)} & no & \textbf{0.4356}\pmstd{0.0020} & \textbf{0.446} \\
+    Logistic boosting & no & 0.4338\pmstd{0.0020} & 0.445 \\
+    \midrule
+    Ensemble + rule & rule & 0.4414\pmstd{0.0021} & 0.449 \\
+    Logistic boosting & feature & 0.4413\pmstd{0.0032} & 0.452 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
 
 \section{Discussion}
 \label{sec:discussion}
-% Discuss strengths/weaknesses of your approach based on the results above.
-% Explain unexpected results, failure cases, limitations.
+
+\emph{Where the gain comes from.} All reasonable models end between 0.43 and
+0.435: the limit is probably the information in the answers, not the model. Products
+and trees give Newton the same +0.0015 and their gains do not combine, so they likely
+capture the same interactions. We did not check that the ensemble's parts err on different people,
+or that GD lags Newton by not converging.
+
+\emph{A column that reveals the label.} \texttt{HAREHAB1} asks about rehabilitation
+\emph{after a heart attack}, so it is asked only to people who had one: all 773
+training rows where it was asked are positive. As a feature it adds 0.0075 in all
+folds, and as a rule it lifts the ensemble to 0.4414. We do not use it: it reveals the
+label, and it exists only after the event.
+
+\emph{Limitations.} The selection rules saw the labels of all training rows, so CV
+is slightly optimistic (unmeasured; the selection itself adds only 0.0002). The data
+ablation uses Newton, not the ensemble; $\lambda = 10^{-6}$ is at its grid edge; and
+there is no nested CV.
 
 \section{Summary}
 \label{sec:summary}
-% Summarize your contributions and findings.
+
+Careful encoding and an ensemble of two Newton logistic regressions give F1 =
+0.4356 in CV and 0.446 on AIcrowd. Threshold and encoding matter most, and a leaking
+column would add score, not usefulness.
 
 \bibliographystyle{IEEEtran}
 \bibliography{references}

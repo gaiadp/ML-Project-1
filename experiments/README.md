@@ -6,19 +6,36 @@ Scripts that produce the results of the report. Contents:
 2. [Settings of a phase](#settings-of-a-phase)
 3. [Running the chain of phases: `run_phases.py`](#running-the-chain-of-phases-run_phasespy)
 4. [One-off runs outside the phases](#one-off-runs-outside-the-phases)
-5. [Baseline table: `baselines.py`](#baseline-table-baselinespy)
-6. [Ablation study: `ablation.py`](#ablation-study-ablationpy)
-7. [HAREHAB1, the label leakage column: `leakage.py`](#harehab1-the-label-leakage-column-leakagepy)
-8. [Notes](#notes)
+5. [Extra scripts: interactions, ensemble, feature screening](#extra-scripts-interactions-ensemble-feature-screening)
+6. [Baseline table: `baselines.py`](#baseline-table-baselinespy)
+7. [Ablation study: `ablation.py`](#ablation-study-ablationpy)
+8. [HAREHAB1, the label leakage column: `leakage.py`](#harehab1-the-label-leakage-column-leakagepy)
+9. [Notes](#notes)
+
+**Official phases and extra scripts.** The phases are the scripts
+`experiments/<method>/0*_*.py`; `run_phases.py` runs them in order and each writes
+`results/<method>/<phase>.json`. The extra scripts (`<method>/extra_*.py`,
+`ensemble.py`, `feature_screening.py`) are run by hand, are never run by
+`run_phases.py`, and write only to `results/<method>/extra/` or `results/ensemble/`:
+they never overwrite a phase file such as `04_final.json`.
+
+**Which model is submitted:** the ensemble of `ensemble.py`, 0.35 x
+`reg_logistic_newton` (`extra/04_final_interactions`) + 0.65 x model A, without
+`HAREHAB1` and without the known-positive rule (`submissions/ensemble_newton_boosting.csv`,
+AIcrowd F1 0.446), reproduced by `run.py`. Here "model A" is `logistic_boosting` phase
+04 (`results/logistic_boosting/04_final.json`), the second component of the ensemble
+(alone: `run_model_a.py`) and the reference of `ablation.py` and `leakage.py`
+(`FINAL_METHOD`, `METHOD`); the ensemble of `ensemble.py` is described below.
 
 Every method folder has a short `README.md`; the files of `results/` (what writes them,
 cost, reproducibility) are listed in [results/README.md](../results/README.md).
 
 Other scripts: `eda.py` (exploratory data analysis, tables and figures in `build/eda/`,
-the figures of the report in `report/figures/`),
+two summary figures in `report/figures/`, not used by the final report),
 `imbalance.py` (class imbalance: threshold vs class weights vs undersampling),
 `smoke_test.py` (~30 s check on 20k real rows before a long run: every pipeline
-variant of the ablation and the final models train and predict; writes nothing).
+variant of the ablation, model A and the models of the ablation train and predict;
+writes nothing).
 
 The exploratory analysis (`eda.py`, analyses A1–A9), its outputs and the column lists it
 led to are described in detail in [EDA.md](EDA.md).
@@ -32,10 +49,11 @@ phase starts from the best result of the previous one:
 |---|---|---|---|
 | `01_baseline.py` | pipeline v0 vs full pipeline vs v1 (full + feature selection from the EDA, `V1_CONFIG`), no expansion (the extra methods compare fewer pipelines, see below) | – | `results/<method>/01_baseline.json` |
 | `02_degree.py` | polynomial degree (`poly_degree`) | best of 01 | `results/<method>/02_degree.json` |
-| `03_interactions.py` | interaction columns (`interaction_top`, `interaction_pairs`) | best of 02 | `results/<method>/03_interactions.json` |
+| `02b_transforms.py` | only `reg_logistic_newton` and `ridge_regression`: sqrt / log of the continuous and count columns (`extra_transforms`, see [src/README.md](../src/README.md)), after a printed correlation check (`check_transforms`) | best of 02 | `results/<method>/02b_transforms.json` |
+| `03_interactions.py` | interaction columns (`interaction_top`, `interaction_pairs`) | best of 02 (of 02b for `reg_logistic_newton`) | `results/<method>/03_interactions.json` |
 | `04_final.py` | CV of the best setting, threshold on the out-of-fold scores, fit on all the training set | best of 03 (`FROM_PHASE`) | `results/<method>/04_final.json`, `submissions/<method>.csv` |
 
-Phases 01–03 only compare settings in 5-fold CV (`run_grid` in `common.py`): every
+Phases 01–03 (and 02b) only compare settings in 5-fold CV (`run_grid` in `common.py`): every
 combination of pipeline variant × hyperparameters, the pipeline fitted inside every
 fold, the decision threshold chosen on the training part of every fold. Only the
 pipeline of the best row passes to the next phase; the hyperparameters are searched
@@ -44,15 +62,25 @@ again in every phase (with more columns the best lambda can change). Phase 04
 chooses the threshold on the out-of-fold scores of a CV, fits the model on all the
 training rows and writes the test predictions.
 
-The 6 methods of `implementations.py` have the four phases. The extra methods of
-`src/extra_implementations` (`reg_logistic_adaptive_gd`, `reg_logistic_newton`,
-`reg_logistic_sophia`, `reg_logistic_unixgrad`, `random_forest`, `gradient_boosting`,
-`logistic_boosting`) have only `01_baseline.py` and `04_final.py` (`FROM_PHASE =
-"01_baseline"`): the four optimizers minimize the same loss as `reg_logistic_regression`
-(phases 02 / 03 would be the same as there), and the trees build interactions by
-themselves. The trees run on pipeline v1 only, since they are slow (minutes per fit);
-the four optimizers compare full and v1 (their saved `01_baseline.json` have only v1
-rows: see [results/README.md](../results/README.md)).
+Which phases each method has:
+
+- The 6 methods of `implementations.py`: 01, 02, 03, 04; `ridge_regression` also
+  02b. Its `03_interactions.py` starts from `02_degree` (`FROM_PHASE`), not from
+  `02b_transforms`.
+- `reg_logistic_newton`: 01, 02, 02b, 03, 04. Its `04_final.py` keeps
+  `FROM_PHASE = "01_baseline"`, so `04_final.json` is the model on pipeline v1; the
+  final model with the expansions of 02-03 is the extra script
+  `extra_final_interactions.py` (below).
+- The other extra methods of `src/extra_implementations` (`reg_logistic_adaptive_gd`,
+  `reg_logistic_sophia`, `reg_logistic_unixgrad`, `random_forest`,
+  `gradient_boosting`, `logistic_boosting`): only `01_baseline.py` and `04_final.py`
+  (`FROM_PHASE = "01_baseline"`). The optimizers minimize the same loss as
+  `reg_logistic_regression`, and the trees build interactions by themselves (for
+  `logistic_boosting` the interactions are tried by an extra script, below).
+
+The trees run on pipeline v1 only, since they are slow (minutes per fit); the four
+optimizers compare full and v1 (their saved `01_baseline.json` have only v1 rows: see
+[results/README.md](../results/README.md)).
 
 A single phase can be run with the Run button or `python experiments/<method>/<phase>.py`;
 to run the chain, use `run_phases.py` (below).
@@ -78,9 +106,11 @@ SEED = 1
 |---|---|---|
 | `METHOD` | all | name of the method (do not change) |
 | `PIPELINES` | 01 | pipelines to compare, e.g. `{"v1": V1_CONFIG}` |
-| `FIT_GRID` | 01, 02, 03 | hyperparameter grid: every combination is tried, e.g. `param_grid(lambda_=[1e-4, 1e-2], gamma=[0.3])` |
-| `FROM_PHASE` | 02, 03, 04 | phase whose best result is the starting point; point it to an earlier phase to skip one |
-| `DEGREES` | 02 | polynomial degrees to try, e.g. `(1, 2, 3)` |
+| `FIT_GRID` | 01, 02, 02b, 03 | hyperparameter grid: every combination is tried, e.g. `param_grid(lambda_=[1e-4, 1e-2], gamma=[0.3])` |
+| `FROM_PHASE` | 02, 02b, 03, 04 | phase whose best result is the starting point; point it to an earlier phase to skip one |
+| `DEGREES` | 02, 02b | polynomial degrees to try, e.g. `(1, 2, 3)`; in 02b `None` = only the degree of the best row of 02 |
+| `TRANSFORMS` | 02b | label -> `extra_transforms` to compare, e.g. `{"none": (), "log": ("log",)}` |
+| `CHECK` | 02b | `True`: print `check_transforms` before the CV |
 | `INTERACTION_TOP` | 03 | numbers of most correlated columns whose products are added, e.g. `(0, 10, 20, 30)` |
 | `INTERACTION_PAIRS` | 03 | pairs of columns chosen by hand, e.g. `(("_AGE80", "_BMI5"),)` |
 | `PIPELINE_OVERRIDES` | 04 | changes to the best pipeline, e.g. `dict(select_features=False)` |
@@ -95,7 +125,9 @@ SEED = 1
 `run_phases.py <method>` runs the phases of a method in order and **skips the phases
 whose result already exists** in `results/<method>/<phase>.json`, so the training is
 not repeated. It has no parameters of its own: it uses the settings of the phase
-scripts, and a JSON file can replace some of them.
+scripts, and a JSON file can replace some of them. The phases are the scripts that
+match `0[0-9]*_*.py`, in name order, so `02b_transforms` runs between `02_degree` and
+`03_interactions`; the `extra_*.py` scripts are not phases.
 
 ### When a phase runs
 
@@ -142,7 +174,8 @@ python experiments/run_phases.py logistic_boosting \
     --config experiments/configs/logistic_boosting_more_trees.json 2>&1 | tee -a run.log
 ```
 
-`--phases` takes full phase names or prefixes (`02`, `02_degree`). Example of
+`--phases` takes full phase names or prefixes (`02`, `02_degree`); the prefix `02`
+also selects `02b_transforms`. Example of
 `--dry-run` output, for `python experiments/run_phases.py logistic_boosting --phases 04
 --force --dry-run`:
 
@@ -186,7 +219,7 @@ model. Phase 01 runs again with this grid, then phase 04 (it depends on 01).
 }
 ```
 
-Example 2, `configs/logistic_boosting_final_400_trees.json`: only the final model, with
+Example 2, `configs/logistic_boosting_final_400_trees.json`: only phase 04, with
 one value forced. Phase 01 is skipped (its result exists); phase 04 starts from its
 best row, with 400 trees.
 
@@ -220,7 +253,7 @@ by hand (the lambda grid of the script is kept).
 }
 ```
 
-Example 5: one pipeline only in phase 01, and the final model without the feature
+Example 5: one pipeline only in phase 01, and phase 04 without the feature
 selection (written inline here, not in `configs/`).
 
 ```json
@@ -232,7 +265,7 @@ selection (written inline here, not in `configs/`).
 
 ### Results
 
-- Phases 01–03: `results/<method>/<phase>.json`, with every row of the grid and the best
+- Phases 01–03 and 02b: `results/<method>/<phase>.json`, with every row of the grid and the best
   one. Every row stores the pipeline and the hyperparameters it used, so a run with a
   config file stays reproducible from its JSON.
 - Phase 04: `results/<method>/04_final.json` and the predictions
@@ -271,6 +304,45 @@ run_grid(s['METHOD'], 'extra/01_more_trees', {'v1': s['V1_CONFIG']},
 `load_best` reads these files too: `FROM_PHASE = "extra/01_more_trees"` in a phase
 (or in a config file) starts from them.
 
+## Extra scripts: interactions, ensemble, feature screening
+
+Scripts outside the phases: `run_phases.py` does not run them and they do not touch
+the phase files. Their results, in tables, are in
+[results/interactions_ensemble_screening.md](../results/interactions_ensemble_screening.md);
+the files, costs and reproducibility are in [results/README.md](../results/README.md).
+
+| Script | What it does | Reads | Writes |
+|---|---|---|---|
+| `reg_logistic_newton/extra_final_interactions.py` | `run_final` with the best row of `03_interactions` (degree 2, log, top 20 interactions): the Newton final model with the expansions, next to `04_final.json` (v1) | `results/reg_logistic_newton/03_interactions.json` | `results/reg_logistic_newton/extra/04_final_interactions.json`, `submissions/reg_logistic_newton_interactions.csv` |
+| `logistic_boosting/extra_interactions.py` | 1. CV grid: the pipeline of `01_baseline` + top 20 interactions (`INTERACTION_TOP = (20,)`), `n_trees` 200 / 400, compared fold by fold with the rows of `01_baseline` with the same fit; 2. `run_final` with the best row of step 1. A step whose file exists is skipped (`--force`) | `results/logistic_boosting/01_baseline.json` | `results/logistic_boosting/extra/03_interactions.json` and `extra/04_final_interactions.json`, `submissions/logistic_boosting_interactions.csv` |
+| `ensemble.py` | `p = a * p_newton + (1 - a) * p_boosting` of the two settings of `COMPONENTS`. CV: for every fold, `a` (grid `WEIGHTS`, 0 to 1 by 0.05) and the threshold are chosen on the out-of-fold probabilities of the other folds; each component alone (`a = 1`, `a = 0`) is scored the same way. Final: `a` and threshold on all the out-of-fold probabilities; one submission without and one with the known-positive rule | `results/reg_logistic_newton/extra/04_final_interactions.json`, `results/logistic_boosting/04_final.json`, the cache `results/ensemble/scores_*.npz` | `results/ensemble/ensemble.json`, the cache if missing, `submissions/ensemble_newton_boosting.csv`, `submissions/ensemble_newton_boosting_rule.csv` |
+| `feature_screening.py` | groups of hand-made features for Newton (comorbidity, risk factor, functional limitation and health care contact counts, clinical interactions), added as extra raw columns. Level 1: score test against the best row of `03_interactions` (reference: the top 20 interactions against `02b_transforms`); level 2: 5-fold CV of the groups that pass (Bonferroni over the groups) | `results/reg_logistic_newton/03_interactions.json`, `02b_transforms.json` | `results/reg_logistic_newton/extra/feature_screening.json` |
+
+```bash
+python experiments/reg_logistic_newton/extra_final_interactions.py
+python experiments/logistic_boosting/extra_interactions.py    # --force: both steps again
+python experiments/ensemble.py                                 # from the cache, no training
+python experiments/ensemble.py --force                         # train the two components again
+python experiments/feature_screening.py                        # levels 1 and 2
+python experiments/feature_screening.py --level 1              # only the score test
+```
+
+Things to know:
+
+- **Order.** `ensemble.py` needs `reg_logistic_newton/extra/04_final_interactions.json`
+  (so `extra_final_interactions.py` after phase 03) and `logistic_boosting/04_final.json`.
+  `feature_screening.py` needs phases 02b and 03 of `reg_logistic_newton`.
+- **The ensemble cache.** `results/ensemble/scores_<method>.npz` hold the out-of-fold
+  and test probabilities of each component; with them `ensemble.py` only chooses the
+  weight and the threshold and writes the two submissions, without training (in a
+  few seconds, see `results/interactions_ensemble_screening.md`). The cache is not invalidated by itself: after a change of a
+  component's result file, use `--force`.
+- **`--level 1`** of `feature_screening.py` rewrites
+  `extra/feature_screening.json` with an empty `level2`.
+- **Which model is submitted** (model A, the ensemble, with or without the
+  known-positive rule): the ensemble, without the rule
+  (`submissions/ensemble_newton_boosting.csv`), reproduced by `run.py`.
+
 ## Baseline table: `baselines.py`
 
 `baselines.py` puts phase 01 of every method in one table (best F1 per pipeline, best
@@ -289,14 +361,15 @@ report). `--rerun` runs the `01_baseline.py` scripts as they are (all their pipe
 
 ## Ablation study: `ablation.py`
 
-How much every choice contributes to the final model: starting from the final model,
-one thing is removed at a time, on the same folds as all the other experiments. Two
+How much every choice contributes to model A (`FINAL_METHOD = "logistic_boosting"`,
+phase 04; the scripts call it "final", which is not a decision on the submission):
+starting from model A, one thing is removed at a time, on the same folds as all the other experiments. Two
 tables:
 
 | Table | What is removed | Model | Hyperparameters |
 |---|---|---|---|
 | Data preparation | one pipeline step at a time: each rule R1–R4 of the feature selection, the whole selection, the selection replaced by the NaN rule B5 (= full pipeline), domain drop, duplicate drop, unit conversion, skip-logic fill, missing indicators, one-hot, one-hot of the ordinals, binning, imputation by type | Newton (`reg_logistic_newton`) | lambda searched again for every variant (`DATA_LAMBDAS`) |
-| Model | the trees on the residuals; then also Newton's exact minimum (plain GD); the tuned threshold (0.5 instead) | the final model (`logistic_boosting`) | fixed, those of the final model |
+| Model | the trees on the residuals; then also Newton's exact minimum (plain GD); the tuned threshold (0.5 instead) | model A (`logistic_boosting`) | fixed, those of model A |
 
 Why two models: removing columns can move the best lambda, so it is searched again
 for every pipeline variant, which is affordable with Newton (~20 s per fit: 90 s per
@@ -306,7 +379,7 @@ not with the hybrid (~44 min per 5-fold CV, the mean over the grid of
 trees, so the steps of the pipeline weigh the same on both. In the model table the
 removed components already had their hyperparameters chosen in CV.
 
-The final model is read from `results/<FINAL_METHOD>/04_final.json`: the pipeline and
+Model A is read from `results/<FINAL_METHOD>/04_final.json`: the pipeline and
 the hyperparameters that phase 04 used for the submission, `FIT_OVERRIDES` /
 `PIPELINE_OVERRIDES` included. So **run phase 04 first** (`run_phases.py <method>`);
 without it the ablation stops and says so. The ablation does not change the model: it
@@ -326,7 +399,7 @@ python experiments/ablation.py --force        # compute everything again
 The CV results go to `results/reg_logistic_newton/ablation_data.json`,
 `results/logistic_boosting/ablation_model.json`,
 `results/reg_logistic_regression/ablation_model.json`; a part whose results exist is
-not computed again (use `--force` after changing the final model or the settings).
+not computed again (use `--force` after changing model A or the settings).
 The tables go to `results/ablation.md` and `results/ablation.tex` (LaTeX tabular).
 
 ## HAREHAB1, the label leakage column: `leakage.py`
@@ -334,12 +407,12 @@ The tables go to `results/ablation.md` and `results/ablation.tex` (LaTeX tabular
 `HAREHAB1` ("after your heart attack, did you go to rehabilitation?") is asked only to
 people who had a heart attack, which is part of the definition of MICHD: the 773
 training rows where it was asked (answers 1, 2, 7, 9) are all positive. Every model
-drops it (`LABEL_LEAKAGE`). `leakage.py` trains two variants of the final model, with
-its setting and folds, without touching it (model A = phase 04):
+drops it (`LABEL_LEAKAGE`). `leakage.py` trains two variants of model A (phase 04 of
+`METHOD = "logistic_boosting"`), with its setting and folds, without touching it:
 
 | Model | What | Result | Submission |
 |---|---|---|---|
-| A | final model, no HAREHAB1 | `results/<method>/04_final.json` | `submissions/<method>.csv` |
+| A | phase 04, no HAREHAB1 | `results/<method>/04_final.json` | `submissions/<method>.csv` |
 | B (`harehab1`) | HAREHAB1 as a feature (`keep_leakage=True` in the pipeline) | `results/<method>/extra/04_final_harehab1.json` | `submissions/<method>_harehab1.csv` |
 | C (`rule`) | model A, then the known-positive rule (`src/rules.py`): rows where HAREHAB1 was asked set to 1 after the threshold | `results/<method>/extra/04_final_rule.json` | `submissions/<method>_rule.csv` |
 
@@ -360,8 +433,9 @@ python experiments/leakage.py --variants rule                  # only C
 python experiments/leakage.py --method reg_logistic_newton     # the same for Newton (minutes)
 ```
 
-In the report: model A is the predictive model; B measures the leakage; C is a
-declared correction of certain labels, not part of the model.
+In the report: A is a predictive model; B measures the leakage; C is a declared
+correction of certain labels, not part of the model. The ensemble has its own rule
+variant (`ensemble.py`, above).
 
 ## Notes
 
@@ -375,7 +449,8 @@ declared correction of certain labels, not part of the model.
   `interaction_top` use the labels of the training part only.
 - The models see 321 columns with v0, 415 with the full pipeline and 334 with v1 (bias
   included; `n_features` in `results/*/01_baseline.json`). Degree p adds the power p of
-  every standardized column with more than p distinct values (how many: not measured
-  yet, there are no `02_degree` results); `interaction_top = k` adds k (k - 1) / 2
-  columns. With 260k training rows per fold, ~600 columns already take ~1.3 GB per
+  every standardized column with more than p distinct values; `interaction_top = k`
+  adds k (k - 1) / 2 columns. For `reg_logistic_newton` on v1 (fold 0): 390 columns
+  with degree 2, 444 with degree 3 (`02_degree.json`), 427 with degree 2 + log
+  (`02b_transforms.json`), 617 with degree 2 + log + top 20 (`03_interactions.json`). With 260k training rows per fold, ~600 columns already take ~1.3 GB per
   matrix.

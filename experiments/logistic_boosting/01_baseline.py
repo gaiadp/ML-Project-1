@@ -22,7 +22,8 @@ PIPELINES = {"v1": V1_CONFIG}
 # lambda_, max_iters: the logistic part (best Newton setting of 01_baseline);
 # the trees only correct it: shallow trees, small learning rate. The first grid
 # (n_trees 100 / 200, depth 2 / 3, Oct 18) had its best at its edge (200, 3):
-# extended to more and deeper trees. ~2-2.5 h in all (5 folds)
+# extended to more and deeper trees. ~2.9 h in all (5 folds; "seconds" in
+# results/logistic_boosting/01_baseline.json)
 FIT_GRID = param_grid(
     lambda_=[1e-4],
     max_iters=[20],

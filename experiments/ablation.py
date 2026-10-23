@@ -8,8 +8,9 @@ in how many folds the variant is better (paired comparison on the same folds).
    the pipeline of the final model (V1_CONFIG). Model: Newton's logistic regression
    (DATA_METHOD), with lambda searched again for every variant (DATA_LAMBDAS), since
    removing or adding columns can move the best lambda. The final model is Newton
-   plus a small correction by trees (+0.001 F1), so the steps of the pipeline are
-   measured with Newton: ~1.5 min per variant and lambda instead of ~16 min.
+   plus a small correction by trees (+0.0015 F1, results/ablation.md), so the steps
+   of the pipeline are measured with Newton: ~1.5 min per variant and lambda instead
+   of ~44 min (mean per setting of results/logistic_boosting/01_baseline.json).
 2. Model: the components of the final model removed, with its hyperparameters fixed
    (their values were already chosen in CV):
        final model        FINAL_METHOD as trained by phase 04 (FINAL_PHASE)
