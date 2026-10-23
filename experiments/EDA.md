@@ -100,16 +100,17 @@ What each analysis sees:
 
 - `build/` is in `.gitignore`: the text tables and the exploratory figures of
   `build/eda/figures/` are not in the repository. Run the script to get them.
-- The two figures of the report, `report/figures/missing_balance.png` (A4) and
-  `report/figures/log_odds.png` (A6), are tracked by git and referenced by
-  `report/report.tex`. **Running A4 or A6 rewrites them**: after a run, `git status`
-  shows them as modified; commit them only if the change is wanted.
+- The two figures `report/figures/missing_balance.png` (A4) and
+  `report/figures/log_odds.png` (A6) are tracked by git but not used by the final
+  report, which has no room for them (its only figure, `report/figures/ablation.pdf`,
+  is written by `report/make_figures.py`). **Running A4 or A6 rewrites them**: after a
+  run, `git status` shows them as modified; commit them only if the change is wanted.
 - The exploratory figures: `mi_ranking.png` (the 24 columns with the highest MI),
   `mi_vs_corr.png` (MI against |r|: columns far above the bulk depend on MICHD in a
   non-linear way or through their NaN), `log_odds_top24.png` (log-odds of MICHD per
   value or decile of the 24 columns with the highest MI, NaN group drawn apart),
   `corr_top.png` (Pearson correlations among the same 24 columns).
-- The report figure `log_odds.png` is the same log-odds grid for 16 columns
+- The figure `log_odds.png` is the same log-odds grid for 16 columns
   (`REPORT_FEATURES`): the highest MI, skipping the columns of `REDUNDANT` and any
   column with |r| > 0.7 with one already chosen (one panel per quantity: one age
   variable, not four).
@@ -313,8 +314,10 @@ linear weight cannot describe (not monotone, curved).
 - B9 `one_hot_min_rows=500`: one column per value with ≥ 500 rows, the rare values of
   `EXRACT11` / `EXRACT21` are merged.
 - The curved columns are the reason to try B11 (`poly_degree`); B11 is tuned per method
-  in phase 02 and is off in the final model. The log transform proposed for some of
-  them is not a pipeline step.
+  in phases 02-03. It is off in model A (`logistic_boosting`), and on in the Newton
+  component of the submitted ensemble (degree 2, log transforms, top 20 interactions:
+  `results/reg_logistic_newton/extra/04_final_interactions.json`). The log transform
+  is the option `extra_transforms` of B11 (see A9).
 
 ### A7 – Redundancy
 
@@ -386,9 +389,12 @@ proposed when it raises |r| by at least 10% and by at least 0.005.
   for the activity and alcohol quantities, e.g. `_DRNKWEK` |r| 0.024 → 0.087,
   `PA1MIN_` 0.003 → 0.070.
 
-**Used for.** No pipeline step: clipping and the log transform are not implemented in
-`src/pipeline.py`, and the out-of-range answers are left as they are. This is an open
-point (section 5).
+**Used for.** The log transform became the option `extra_transforms` of B11
+(`log(1 + x - min)` of the continuous and count columns, `src/README.md`), tested in
+phase 02b of `reg_logistic_newton`: 0.4323 -> 0.4324
+(`results/reg_logistic_newton/02b_transforms.json`), kept only in the Newton component
+of the submitted ensemble. The percentile clipping is not implemented, and the
+out-of-range answers are left as they are (section 5).
 
 ### Summary
 
@@ -402,7 +408,7 @@ point (section 5).
 | A6 | MI ranking, shape of the log-odds | R1, R2, R4, `ONE_HOT_ORDINAL` (B9), B11 to try |
 | A7 | duplicates | `REDUNDANT` (B2b), `CONVERTED` (B3), `ONE_HOT_ORDINAL` |
 | A8 | no shift | none |
-| A9 | outliers, proposed transforms | none (not implemented) |
+| A9 | outliers, proposed transforms | `extra_transforms` (log, B11); clipping not implemented |
 
 ## 4. Choice of the columns
 
@@ -512,8 +518,9 @@ has MI < 1 mbit, and every R2 column has more than 85% NaN.
 - **Discretization.** MI and the log-odds shape of numeric columns are computed on 10
   quantile bins (A6), and A7 uses 100 bins on a sample of 100,000 rows: other choices
   would move the numbers near the thresholds.
-- **Open points.** The clipping and log transforms proposed by A9 are not implemented;
-  the out-of-range answers (e.g. 402 values of `_BMI5`) are kept. A6 proposes `PHYSHLTH`
+- **Open points.** The percentile clipping proposed by A9 is not implemented (the log
+  transform is, as `extra_transforms`); the out-of-range answers (e.g. 402 values of
+  `_BMI5`) are kept. A6 proposes `PHYSHLTH`
   as "linear" (R² 0.91), while the pipeline bins it (B10); the ablation keeps the bins
   (without them −0.0010).
 
@@ -540,18 +547,20 @@ predicting it.
 
 - The column is in `DOMAIN_DROP` and in `LABEL_LEAKAGE` (`src/feature_types.py`). Every
   pipeline configuration drops it, also when `domain_drop` is switched off for the
-  ablation (`_candidate_columns` in `src/pipeline.py`). The model we submit (model A,
-  `run.py`) never sees it.
+  ablation (`_candidate_columns` in `src/pipeline.py`). The model we submit (the
+  ensemble of `experiments/ensemble.py`, reproduced by `run.py`) never sees it.
 - `keep_leakage=True` keeps it, only to measure what the leakage is worth
   (`experiments/leakage.py`, model B).
 - `src/rules.py` (`known_positives`, `apply_known_positives`) sets to 1, after the
   threshold, the rows where the question was asked (model C). It is a certain
   correction of labels for this survey, not part of the predictive model; `run.py` does
-  not apply it.
+  not apply it. On the submitted ensemble it gives 0.4414 ± 0.0021
+  (`results/ensemble/ensemble.json`).
 - What it is worth (`results/ablation.md`, model table, same folds): final model
   0.4338 ± 0.0020; with `HAREHAB1` as a feature 0.4413 ± 0.0032 (+0.0075, better in
-  5/5 folds); final model + rule 0.4400 ± 0.0026 (+0.0062, 5/5). In the report, model A
-  is the result; B and C are mentioned as a measure of the leakage.
+  5/5 folds); final model + rule 0.4400 ± 0.0026 (+0.0062, 5/5). In the report, the
+  submitted ensemble (without `HAREHAB1`) is the result; B and C are mentioned as a
+  measure of the leakage.
 
 `STREHAB1` (rehabilitation after a stroke) is a different case: a stroke is not part of
 MICHD, and the column has 35.7% MICHD among its answers, not 100% (A4). It is removed by

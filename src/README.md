@@ -82,10 +82,13 @@ Where this chain runs:
 - `experiments/common.py`, `run_final` (phase 04): threshold on the out-of-fold
   scores of the CV, then `fit_preprocess` and `fit` on the whole training set and
   predictions for `x_test` in `submissions/<method>.csv`.
-- `run.py`: model A (`logistic_boosting`) with the setting and the out-of-fold
-  threshold of `results/logistic_boosting/04_final.json`, written as constants:
-  `fit_preprocess` and `fit` on the whole training set, no CV, predictions in
-  `submissions/submission.csv`.
+- `run.py`: the submitted ensemble. Its two components (`reg_logistic_newton` with
+  the setting of `results/reg_logistic_newton/extra/04_final_interactions.json`,
+  `logistic_boosting` with that of `results/logistic_boosting/04_final.json`), written
+  as constants: `fit_preprocess` and `fit` on the whole training set, no CV, test
+  probabilities averaged with the weight and cut at the threshold of
+  `results/ensemble/ensemble.json` (`final`), predictions in
+  `submissions/submission.csv`. Model A alone: `experiments/run_model_a.py`.
 - `experiments/ensemble.py`: the out-of-fold and test probabilities of two final
   settings (`cross_validate`, then a full fit), averaged with a weight chosen on the
   out-of-fold probabilities, like the threshold.
@@ -107,9 +110,9 @@ Where this chain runs:
    builds its own 0/1 indicator `y01` for statistics and plots.)
 3. **The threshold is never chosen on the rows it is scored on.** In the CV it comes
    from the training scores of the fold; in phase 04 from the out-of-fold scores.
-   `f1_val_best` is only a comparison. `run.py` uses the out-of-fold threshold saved
-   by phase 04; `ensemble.py` chooses weight and threshold on the other folds in its
-   CV.
+   `f1_val_best` is only a comparison. `run.py` uses the weight and the threshold
+   that `ensemble.py` chose on the out-of-fold probabilities (`ensemble.json`,
+   `final`); in its CV, `ensemble.py` chooses them on the other folds.
 4. **`HAREHAB1` never enters a reported model.** `LABEL_LEAKAGE` is dropped by every
    config, also without `domain_drop`; `keep_leakage=True` is used only by
    `experiments/leakage.py` to measure the leakage. The known-positive rule works on

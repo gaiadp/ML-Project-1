@@ -31,7 +31,7 @@ Every method folder has a short `README.md`; the files of `results/` (what write
 cost, reproducibility) are listed in [results/README.md](../results/README.md).
 
 Other scripts: `eda.py` (exploratory data analysis, tables and figures in `build/eda/`,
-the figures of the report in `report/figures/`),
+two summary figures in `report/figures/`, not used by the final report),
 `imbalance.py` (class imbalance: threshold vs class weights vs undersampling),
 `smoke_test.py` (~30 s check on 20k real rows before a long run: every pipeline
 variant of the ablation, model A and the models of the ablation train and predict;
