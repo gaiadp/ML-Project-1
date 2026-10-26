@@ -32,6 +32,7 @@ if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
 from helpers import create_csv_submission  # noqa: E402
+from implementations import least_squares  # noqa: E402
 from src.cross_validation import cross_validate, cross_validate_grid  # noqa: E402
 from src.data import load_data  # noqa: E402
 from src.metrics import best_threshold, predict_labels  # noqa: E402
@@ -278,7 +279,10 @@ def _corr(a, b):
 
 def _residual(v, basis):
     """v minus its least squares projection on the columns of basis."""
-    coef, *_ = np.linalg.lstsq(basis, v, rcond=None)
+    # least_squares of implementations.py (pseudo-inverse of basis^T basis), since
+    # numpy.linalg.lstsq is not allowed; the powers of a standardized column are
+    # well conditioned enough for the normal equations
+    coef, _ = least_squares(v, basis)
     return v - basis @ coef
 
 

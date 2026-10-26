@@ -14,7 +14,8 @@ The constants are the setting saved in results/logistic_boosting/04_final.json b
 experiments/logistic_boosting/04_final.py. That script also runs a 5-fold CV to choose
 the decision threshold; here the CV is skipped and its threshold is used directly.
 
-Running time: to be measured.
+Running time: about 11 minutes, estimated from run.py (not measured for this script):
+there the same model (preprocessing and 400 trees on 336 columns) takes about 645 s.
 
 Usage (from the repository root):
     python experiments/run_model_a.py

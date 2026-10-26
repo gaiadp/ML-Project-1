@@ -4,12 +4,16 @@ The phases of a method are its scripts experiments/<method>/0*.py (01_baseline,
 02_degree, 02b_transforms, 03_interactions, 04_final; 02b only for ridge_regression
 and reg_logistic_newton; only 01 and 04 for the extra methods other than
 reg_logistic_newton; the extra_*.py scripts are not phases). Each phase reads the
-best result of the previous one (experiments/common.py), so they must run in order.
-A phase is skipped when its result results/<method>/<phase>.json already exists,
-unless:
+best result of an earlier one, its FROM_PHASE (experiments/common.py), so they run
+in order. A phase is skipped when its result results/<method>/<phase>.json already
+exists, unless:
     --force                  every selected phase runs again
     --config file.json       the file changes some settings of the phase
-    a previous phase runs    the later phases depend on it, they run again too
+    its FROM_PHASE runs      its starting point changes, so it runs again too
+                             (and so do the phases that read it, and so on)
+A phase that does not read the one that runs is not affected: e.g. running 02b of
+ridge_regression does not run 03 again (its FROM_PHASE is 02_degree), and running
+02-03 of reg_logistic_newton does not run 04 again (its FROM_PHASE is 01_baseline).
 If you edit the settings block of a script by hand, use --force (or --config): the
 existing result would be skipped otherwise.
 
@@ -106,18 +110,32 @@ def apply_settings(namespace, settings, phase):
     namespace.update(convert_settings(settings))
 
 
-def plan(phases, done, changed, force):
+def plan(phases, done, changed, force, reads):
     """Which phases run: [(phase, True / False)], in order.
 
     A phase runs if forced, if its result is missing (not in done), if its settings
-    are changed by the config file (in changed), or if a previous phase runs.
+    are changed by the config file (in changed), or if the phase it reads runs.
+
+    Args:
+        phases: phase names, in order
+        done: phases whose result exists
+        changed: phases whose settings the config file changes
+        force: True to run every phase
+        reads: dict phase -> its FROM_PHASE (None for 01_baseline). The FROM_PHASE
+            of a phase comes before it, so one pass in order is enough.
     """
     out = []
-    previous_runs = False
+    running = set()
     for phase in phases:
-        runs = force or previous_runs or phase not in done or phase in changed
+        runs = (
+            force
+            or phase not in done
+            or phase in changed
+            or reads.get(phase) in running
+        )
+        if runs:
+            running.add(phase)
         out.append((phase, runs))
-        previous_runs = previous_runs or runs
     return out
 
 
@@ -169,15 +187,17 @@ def main():
             unknown = sorted(set(settings) - set(scripts))
             if unknown:
                 raise ValueError(f"config file: no phase {unknown} for {args.method}")
-        done = {p for p in phases if os.path.exists(result_path(args.method, p))}
-        steps = plan(phases, done, set(settings), args.force)
-        # load and check the settings of every phase that runs before starting:
-        # a wrong name in the config file must not stop the chain after hours
+        # load and check the settings of every selected phase before starting: a
+        # wrong name in the config file must not stop the chain after hours; the
+        # FROM_PHASE of each phase (maybe changed by the config file) decides which
+        # phases depend on the ones that run
         namespaces = {}
-        for phase, runs in steps:
-            if runs:
-                namespaces[phase] = load_settings(scripts[phase])
-                apply_settings(namespaces[phase], settings.get(phase, {}), phase)
+        for phase in phases:
+            namespaces[phase] = load_settings(scripts[phase])
+            apply_settings(namespaces[phase], settings.get(phase, {}), phase)
+        reads = {phase: namespaces[phase].get("FROM_PHASE") for phase in phases}
+        done = {p for p in phases if os.path.exists(result_path(args.method, p))}
+        steps = plan(phases, done, set(settings), args.force, reads)
     except ValueError as error:
         parser.error(str(error))
 

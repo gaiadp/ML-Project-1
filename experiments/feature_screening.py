@@ -209,7 +209,24 @@ def score_test(tx, w, lambda_, h_bb, y01, x_new):
     h_nb = (x_new * s[:, None]).T @ tx / n
     h_nn = x_new.T @ (x_new * s[:, None]) / n + 2 * lambda_ * np.eye(x_new.shape[1])
     info = h_nn - h_nb @ np.linalg.solve(h_bb, h_nb.T)
-    return float(n * g @ np.linalg.lstsq(info, g, rcond=None)[0]), x_new.shape[1]
+    # pseudo-inverse, not solve: info is (nearly) singular when the new columns
+    # (nearly) repeat the old ones, e.g. the comorbidity count, a sum of columns the
+    # model has
+    return float(n * g @ _pinv_solve(info, g)), x_new.shape[1]
+
+
+def _pinv_solve(a, b):
+    """Minimum-norm solution of a v = b for a symmetric matrix a (pseudo-inverse).
+
+    numpy.linalg.lstsq is not allowed: like implementations.least_squares, invert the
+    eigenvalues of a, and count as 0 those below the numerical tolerance.
+    """
+    eigvals, eigvecs = np.linalg.eigh(a)
+    tol = np.abs(eigvals).max() * a.shape[0] * np.finfo(eigvals.dtype).eps
+    inv = np.zeros_like(eigvals)
+    keep = np.abs(eigvals) > tol
+    inv[keep] = 1.0 / eigvals[keep]
+    return eigvecs @ (inv * (eigvecs.T @ b))
 
 
 def chi2_pvalue(stat, df):

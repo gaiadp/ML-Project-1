@@ -134,8 +134,9 @@ match `0[0-9]*_*.py`, in name order, so `02b_transforms` runs between `02_degree
 ### When a phase runs
 
 A phase runs if its result is missing, or with `--force`, or if the `--config` file
-changes its settings, or if a previous phase runs (the later phases depend on it).
-Otherwise it is skipped. With four phases:
+changes its settings, or if the phase it reads (its `FROM_PHASE`) runs: its starting
+point changes, so it runs again too, and so do the phases that read it. Otherwise it is
+skipped. With four phases, each reading the previous one:
 
 | Situation | 01 | 02 | 03 | 04 |
 |---|---|---|---|---|
@@ -145,8 +146,13 @@ Otherwise it is skipped. With four phases:
 | all the results exist, the config file changes 02 | skip | run | run | run |
 | only 02 is missing | skip | run | run | run |
 
-Before anything starts, the settings of every phase that will run are loaded and
-checked: a wrong name in the config file stops at once, not after hours of phase 01.
+A phase that does not read the one that runs is not affected. In `ridge_regression`,
+`03_interactions` reads `02_degree`, so running `02b_transforms` does not run 03 and
+04 again; in `reg_logistic_newton`, `04_final` reads `01_baseline`, so running 02-03
+does not run 04 again.
+
+Before anything starts, the settings of every selected phase are loaded and checked:
+a wrong name in the config file stops at once, not after hours of phase 01.
 
 ### Commands
 

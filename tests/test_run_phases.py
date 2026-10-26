@@ -39,8 +39,12 @@ def test_select_phases():
 
 
 def test_plan():
-    def runs(done, changed=(), force=False):
-        return [r for _, r in plan(PHASES, set(done), set(changed), force)]
+    # each phase reads the previous one
+    chain = dict(zip(PHASES[1:], PHASES))
+
+    def runs(done, changed=(), force=False, phases=PHASES, reads=chain):
+        steps = plan(phases, set(done), set(changed), force, reads)
+        return [r for _, r in steps]
 
     # 01 and 02 done: only the missing ones
     assert runs(PHASES[:2]) == [False, False, True, True]
@@ -52,6 +56,26 @@ def test_plan():
     # a missing phase in the middle: it and the later ones
     done = ["01_baseline", "03_interactions", "04_final"]
     assert runs(done) == [False, True, True, True]
+
+    # ridge_regression: 03 reads 02_degree, so running 02b does not run 03 again
+    phases = PHASES[:2] + ["02b_transforms"] + PHASES[2:]
+    reads = {**chain, "02b_transforms": "02_degree"}
+    done = [p for p in phases if p != "02b_transforms"]
+    assert runs(done, phases=phases, reads=reads) == [False, False, True, False, False]
+    # reg_logistic_newton: 04 reads 01_baseline, so running 02 does not run 04 again
+    reads = {**chain, "04_final": "01_baseline"}
+    expected = [False, True, True, False]
+    assert runs(PHASES, changed=["02_degree"], reads=reads) == expected
+
+
+def test_from_phase_of_the_scripts():
+    def reads(method, phase):
+        return load_settings(phase_scripts(method)[phase]).get("FROM_PHASE")
+
+    assert reads("ridge_regression", "01_baseline") is None
+    assert reads("ridge_regression", "03_interactions") == "02_degree"
+    assert reads("reg_logistic_newton", "03_interactions") == "02b_transforms"
+    assert reads("reg_logistic_newton", "04_final") == "01_baseline"
 
 
 def test_convert_settings():
