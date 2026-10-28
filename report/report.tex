@@ -66,8 +66,8 @@ fold, and a measured label leak.
 Our exploratory analysis found three problems.
 \emph{Codes are not values:} 7 usually means ``don't know'', but ``retired'' for the
 employment question, so we wrote one rule per column from the codebook.
-\emph{Missing values are everywhere and informative:} an average column is 47\% missing, because of optional modules and of skip logic (a follow-up question is
-not asked when it does not apply); people who answered the diabetes module have 21.9\%
+\emph{Missing values are everywhere and informative:} an average column is 47\% missing, due to optional modules and skip logic (a follow-up question is
+skipped when it does not apply); people who answered the diabetes module have 21.9\%
 MICHD, the others 7.9\%. \emph{Many columns repeat others.} Train and test are
 distributed alike.
 
@@ -95,8 +95,8 @@ $\lambda\|w\|^2$.
 
 \emph{Other optimizers} of the regularized logistic loss: adaptive-step GD
 (Barzilai--Borwein~\cite{barzilai1988}), UniXGrad~\cite{kavis2019unixgrad},
-Sophia~\cite{liu2023sophia}, and \emph{Newton's method}, which uses the curvature of
-the loss to set each step: about 10 steps reach the minimum, with no step size.
+Sophia~\cite{liu2023sophia}, and \emph{Newton's method}, which sets each step from the
+loss curvature (no step size): about 10 steps reach the minimum.
 
 \emph{Trees} on 32 bins per column~\cite{ke2017lightgbm}: a random
 forest~\cite{breiman2001} and gradient
@@ -191,15 +191,15 @@ stays at 0.3928. Trees alone do worse.
 
 \emph{Ablation (Fig.~\ref{fig:ablation}).} The threshold dwarfs everything: at
 $t = 0.5$, logistic boosting scores 0.2395 instead of 0.4338. Among data steps only one-hot
-encoding is large; the selection adds nothing measurable, and each cleaning step not
-shown changes F1 by less than 0.001. Squares and logarithms change nothing (0.4323 to
-0.4324), products do not help logistic boosting ($-0.0005$), and clinical features
-lower F1 by 0.0004 to 0.0013.
+encoding is large; selection adds nothing measurable, and each cleaning step not
+shown changes F1 by ${<}0.001$. Squares and logarithms change nothing ($+0.0001$),
+products do not help logistic boosting ($-0.0005$), and clinical features
+lower F1 by 0.0004--0.0013.
 
-\emph{Submissions.} The ensemble weight is stable across folds (0.35 to 0.40). On
+\emph{Submissions.} The ensemble weight is stable across folds (0.35--0.40). On
 AIcrowd the ensemble scores 0.446 (logistic boosting alone 0.445). Our best online
 score, 0.452, used the leaking column discussed below (0.449 as a rule on the
-ensemble): the test performance of our submission is 0.446.
+ensemble): the test F1 of our submission is 0.446.
 
 \section{Discussion}
 \label{sec:discussion}
@@ -229,7 +229,7 @@ label, and it exists only after the event.
 is slightly optimistic (unmeasured; the selection itself adds only 0.0002). The
 ablation uses Newton (data) and logistic boosting (model), not the ensemble, which was
 too slow to retune for every variant; since the ensemble adds only 0.0033 to Newton
-alone, the gains should be similar for it. $\lambda = 10^{-6}$ is at its grid edge,
+alone, its gains should be similar. $\lambda = 10^{-6}$ is at its grid edge,
 and there is no nested CV.
 
 \section{Summary}
